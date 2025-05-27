@@ -1,0 +1,20 @@
+{
+  "name": "Date and Text Fields",
+  "description": "Allows users to add multiple date and text field pairs.",
+  "version": "1.0",
+  "author": "Your Name",
+  "settings": [
+    {
+      "type": "color",
+      "label": "Add Button Color",
+      "name": "addButtonColor",
+      "default": "#6974b5"
+    },
+    {
+      "type": "color",
+      "label": "Remove Button Color",
+      "name": "removeButtonColor",
+      "default": "#6974b5"
+    }
+  ]
+}
