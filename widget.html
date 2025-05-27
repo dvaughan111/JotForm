@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Helvetica, Arial, sans-serif; /* Changed to Helvetica, with Arial as fallback */
             padding: 10px;
             margin: 0;
         }
-        
-        .add-button {
-            background: #007bff;
+
+        .add-button,
+        .remove-button {
             color: white;
             padding: 10px 20px;
             border: none;
@@ -19,15 +20,29 @@
             font-size: 14px;
             margin-bottom: 15px;
         }
-        
+
+        .add-button {
+            /* Color will be set dynamically */
+        }
+
+        .remove-button {
+            font-size: 12px;
+            padding: 5px 10px;
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            margin-bottom: 0;
+        }
+
         .field-group {
             border: 1px solid #ccc;
             padding: 15px;
             margin: 10px 0;
             border-radius: 4px;
             background: #f9f9f9;
+            position: relative;
         }
-        
+
         .date-field {
             width: 120px;
             padding: 6px;
@@ -35,7 +50,7 @@
             border-radius: 4px;
             margin: 5px 0;
         }
-        
+
         .text-field {
             width: 400px;
             max-width: 100%;
@@ -43,68 +58,78 @@
             padding: 6px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-family: Arial, sans-serif;
+            font-family: Helvetica, Arial, sans-serif; /* Consistent font */
             resize: none;
             overflow: hidden;
             line-height: 1.4;
             box-sizing: border-box;
         }
-        
-        .remove-button {
-            background: #dc3545;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            cursor: pointer;
-            border-radius: 4px;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-        
+
         .field-label {
-            font-weight: bold;
+            font-weight: normal; /* Removed bold */
             margin: 5px 0;
         }
     </style>
 </head>
+
 <body>
     <button class="add-button" onclick="addDateTextField()">Add Date + Text Field</button>
     <div id="container"></div>
-    
+
     <script>
         let counter = 0;
         let widgetData = {};
-        
-        // Always subscribe to ready event - this is required by JotForm
+        let addButtonColor;
+        let removeButtonColor;
+
+        // Always subscribe to ready event
         JFCustomWidget.subscribe("ready", function(data) {
-            // Load existing data if editing a submission
             if (data && data.value) {
                 try {
                     widgetData = JSON.parse(data.value);
-                    // Restore existing fields here if needed
-                } catch(e) {
+                } catch (e) {
                     widgetData = {};
                 }
             }
         });
-        
-        // Subscribe to submit event - required for form submission
+
+        // Subscribe to settings read event
+        JFCustomWidget.subscribe("settingsRead", function(data) {
+            addButtonColor = data.addButtonColor || '#6974b5';
+            removeButtonColor = data.removeButtonColor || '#6974b5';
+            applyButtonColors();
+            requestResize();
+        });
+
+        function applyButtonColors() {
+            const addButtons = document.querySelectorAll('.add-button');
+            addButtons.forEach(button => {
+                button.style.backgroundColor = addButtonColor;
+            });
+
+            const removeButtons = document.querySelectorAll('.remove-button');
+            removeButtons.forEach(button => {
+                button.style.backgroundColor = removeButtonColor;
+            });
+        }
+
+        // Subscribe to submit event
         JFCustomWidget.subscribe("submit", function() {
             var result = {
-                valid: true, // Always set to true since this widget doesn't have required validation
+                valid: true,
                 value: JSON.stringify(widgetData)
             };
             JFCustomWidget.sendSubmit(result);
         });
-        
+
         function addDateTextField() {
             counter++;
-            
+
             var container = document.getElementById('container');
             var fieldGroup = document.createElement('div');
             fieldGroup.className = 'field-group';
             fieldGroup.id = 'group-' + counter;
-            
+
             fieldGroup.innerHTML = `
                 <div class="field-label">Date ${counter}:</div>
                 <input type="date" class="date-field" name="date_${counter}" onchange="updateData()">
@@ -112,20 +137,19 @@
                 <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
                 <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
             `;
-            
+
             container.appendChild(fieldGroup);
+            applyButtonColors();
             updateData();
-            
-            // Request frame resize to accommodate new content
             requestResize();
         }
-        
+
         function autoResize(textarea) {
             textarea.style.height = 'auto';
             const lineHeight = 20;
             const baseLines = 8;
             const currentLines = Math.ceil(textarea.scrollHeight / lineHeight);
-            
+
             if (currentLines > baseLines) {
                 const additionalLines = Math.ceil((currentLines - baseLines) / 2) * 2;
                 const newHeight = (baseLines + additionalLines) * lineHeight;
@@ -133,53 +157,47 @@
             } else {
                 textarea.style.height = (baseLines * lineHeight) + 'px';
             }
-            
-            // Request frame resize when text area expands
             requestResize();
         }
-        
+
         function removeGroup(groupId) {
             document.getElementById(groupId).remove();
             updateData();
             requestResize();
         }
-        
+
         function updateData() {
             const data = {};
             const dateFields = document.querySelectorAll('.date-field');
             const textFields = document.querySelectorAll('.text-field');
-            
+
             dateFields.forEach(field => {
                 if (field.value) {
                     data[field.name] = field.value;
                 }
             });
-            
+
             textFields.forEach(field => {
                 if (field.value) {
                     data[field.name] = field.value;
                 }
             });
-            
+
             widgetData = data;
-            
-            // Send data to JotForm using sendData method
             JFCustomWidget.sendData({
                 value: JSON.stringify(widgetData)
             });
         }
-        
+
         function requestResize() {
-            // Calculate total height needed
             const body = document.body;
             const html = document.documentElement;
             const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
-            
-            // Request frame resize
             JFCustomWidget.requestFrameResize({
-                height: height + 20 // Add some padding
+                height: height + 20
             });
         }
     </script>
 </body>
+
 </html>
