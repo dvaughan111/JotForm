@@ -5,7 +5,7 @@
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <style>
         body {
-            font-family: Helvetica, Arial, sans-serif; /* Changed to Helvetica, with Arial as fallback */
+            font-family: Arial, sans-serif;
             padding: 10px;
             margin: 0;
         }
@@ -22,10 +22,12 @@
         }
 
         .add-button {
+            background-color: #666666; /* Darker gray for Add button */
             /* Color will be set dynamically */
         }
 
         .remove-button {
+            background-color: #666666; /* Darker gray for Remove button */
             font-size: 12px;
             padding: 5px 10px;
             position: absolute;
@@ -40,7 +42,7 @@
             margin: 10px 0;
             border-radius: 4px;
             background: #f9f9f9;
-            position: relative;
+            position: relative; /* Needed for positioning Remove button */
         }
 
         .date-field {
@@ -58,7 +60,7 @@
             padding: 6px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-family: Helvetica, Arial, sans-serif; /* Consistent font */
+            font-family: Arial, sans-serif;
             resize: none;
             overflow: hidden;
             line-height: 1.4;
@@ -66,7 +68,7 @@
         }
 
         .field-label {
-            font-weight: normal; /* Removed bold */
+            font-weight: bold;
             margin: 5px 0;
         }
     </style>
@@ -79,8 +81,8 @@
     <script>
         let counter = 0;
         let widgetData = {};
-        let addButtonColor;
-        let removeButtonColor;
+        let addButtonColor = '#666666'; // Default darker gray
+        let removeButtonColor = '#666666'; // Default darker gray
 
         // Always subscribe to ready event
         JFCustomWidget.subscribe("ready", function(data) {
@@ -95,8 +97,8 @@
 
         // Subscribe to settings read event
         JFCustomWidget.subscribe("settingsRead", function(data) {
-            addButtonColor = data.addButtonColor || '#6974b5';
-            removeButtonColor = data.removeButtonColor || '#6974b5';
+            addButtonColor = data.addButtonColor || '#666666';
+            removeButtonColor = data.removeButtonColor || '#666666';
             applyButtonColors();
             requestResize();
         });
