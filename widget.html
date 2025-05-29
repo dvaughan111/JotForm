@@ -32,7 +32,7 @@
             margin: 10px 0;
             border-radius: 4px;
             background: #f9f9f9;
-            position: relative;
+            position: relative; /* Keep relative positioning for this */
         }
 
         .date-field {
@@ -41,10 +41,6 @@
             border: 1px solid #ccc;
             border-radius: 4px;
             margin: 5px 0;
-        }
-
-        .text-field-container {
-            position: relative;
         }
 
         .text-field {
@@ -69,8 +65,9 @@
             border-radius: 4px;
             position: absolute;
             bottom: 5px;
-            left: 0; /* Changed from right to left */
-            margin-bottom: 0;
+            left: 0;
+            /* Calculate bottom position to be *below* the textarea */
+            bottom: -5px; /* Adjust this value as needed */
         }
 
         .field-label {
@@ -142,10 +139,8 @@
                 <div class="field-label">Date ${counter}:</div>
                 <input type="date" class="date-field" name="date_${counter}" onchange="updateData()">
                 <div class="field-label">Text ${counter}:</div>
-                <div class="text-field-container">
-                    <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
-                    <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
-                </div>
+                <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
+                <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
             `;
 
             container.appendChild(fieldGroup);
