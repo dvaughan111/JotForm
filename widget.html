@@ -27,12 +27,12 @@
         }
 
         .field-group {
-            border: 1px solid #ccc;
+            /* border: 1px solid #ccc; */ /* Removed the border */
             padding: 15px;
             margin: 10px 0;
             border-radius: 4px;
             background: #f9f9f9;
-            position: relative; /* Keep relative positioning for this */
+            position: relative;
         }
 
         .date-field {
@@ -41,10 +41,11 @@
             border: 1px solid #ccc;
             border-radius: 4px;
             margin: 5px 0;
+            font-family: Helvetica, Arial, sans-serif; /* Helvetica for date */
         }
 
         .text-field {
-            width: 400px;
+            width: 700px; /* Increased width */
             max-width: 100%;
             min-height: 120px;
             padding: 6px;
@@ -64,10 +65,9 @@
             cursor: pointer;
             border-radius: 4px;
             position: absolute;
-            bottom: 5px;
+            bottom: -5px;
             left: 0;
-            /* Calculate bottom position to be *below* the textarea */
-            bottom: -5px; /* Adjust this value as needed */
+            margin-bottom: 0;
         }
 
         .field-label {
