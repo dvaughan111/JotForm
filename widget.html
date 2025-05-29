@@ -19,21 +19,11 @@
             border-radius: 4px;
             font-size: 14px;
             margin-bottom: 15px;
+            background-color: #666666; /* Default darker gray */
         }
 
         .add-button {
-            background-color: #666666; /* Darker gray for Add button */
             /* Color will be set dynamically */
-        }
-
-        .remove-button {
-            background-color: #666666; /* Darker gray for Remove button */
-            font-size: 12px;
-            padding: 5px 10px;
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            margin-bottom: 0;
         }
 
         .field-group {
@@ -53,6 +43,10 @@
             margin: 5px 0;
         }
 
+        .text-field-container {
+            position: relative; /* Container for text field and remove button */
+        }
+
         .text-field {
             width: 400px;
             max-width: 100%;
@@ -65,6 +59,18 @@
             overflow: hidden;
             line-height: 1.4;
             box-sizing: border-box;
+        }
+
+        .remove-button {
+            font-size: 12px;
+            padding: 5px 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            margin-bottom: 0;
         }
 
         .field-label {
@@ -136,8 +142,10 @@
                 <div class="field-label">Date ${counter}:</div>
                 <input type="date" class="date-field" name="date_${counter}" onchange="updateData()">
                 <div class="field-label">Text ${counter}:</div>
-                <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
-                <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
+                <div class="text-field-container">
+                    <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
+                    <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
+                </div>
             `;
 
             container.appendChild(fieldGroup);
