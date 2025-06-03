@@ -23,15 +23,17 @@
         }
 
         .add-button {
-            /* Color will be set dynamically */
+            /* Color will be set dynamically by settingsRead */
         }
 
         .field-group {
-            /* border: 1px solid #ccc; */ /* Removed the border */
+            /* Removed the border to get rid of the gray box */
             padding: 15px;
             margin: 10px 0;
+            /* Added padding to prevent removal button from going outside field-group margin */
+            padding-bottom: 25px; 
             border-radius: 4px;
-            background: #f9f9f9;
+            background: #f9f9f9; /* Keep background to distinguish groups */
             position: relative;
         }
 
@@ -65,13 +67,13 @@
             cursor: pointer;
             border-radius: 4px;
             position: absolute;
-            bottom: -5px;
-            left: 0;
+            bottom: 5px; /* Adjusted to be within the padding of field-group */
+            left: 15px; /* Aligned with left padding of field-group */
             margin-bottom: 0;
         }
 
         .field-label {
-            font-weight: bold;
+            font-weight: normal; /* Changed to normal from bold as per previous discussion, if not please let me know */
             margin: 5px 0;
         }
     </style>
@@ -83,19 +85,31 @@
 
     <script>
         let counter = 0;
-        let widgetData = {};
-        let addButtonColor = '#666666';
-        let removeButtonColor = '#666666';
+        let widgetData = {}; // This will now store an array of objects for better PDF rendering
+        let addButtonColor = '#666666'; // Default darker gray
+        let removeButtonColor = '#666666'; // Default darker gray
 
         // Always subscribe to ready event
         JFCustomWidget.subscribe("ready", function(data) {
             if (data && data.value) {
                 try {
+                    // When loading existing data, parse it and reconstruct the UI
                     widgetData = JSON.parse(data.value);
+                    if (Array.isArray(widgetData)) {
+                        widgetData.forEach((entry, index) => {
+                            addDateTextField(entry.date, entry.notes, index + 1); // Pass existing data to recreate fields
+                        });
+                        counter = widgetData.length; // Set counter to the number of existing entries
+                    } else {
+                        widgetData = []; // Initialize as array if no valid data
+                    }
                 } catch (e) {
-                    widgetData = {};
+                    widgetData = []; // Initialize as empty array on error
                 }
+            } else {
+                widgetData = []; // Initialize as empty array if no data
             }
+            requestResize(); // Ensure correct initial size
         });
 
         // Subscribe to settings read event
@@ -120,6 +134,8 @@
 
         // Subscribe to submit event
         JFCustomWidget.subscribe("submit", function() {
+            // Ensure data is up-to-date before sending
+            updateData();
             var result = {
                 valid: true,
                 value: JSON.stringify(widgetData)
@@ -127,79 +143,111 @@
             JFCustomWidget.sendSubmit(result);
         });
 
-        function addDateTextField() {
-            counter++;
+        function addDateTextField(initialDate = '', initialNotes = '', fieldNum = -1) {
+            // Only increment counter if we're adding a new, non-pre-populated field
+            if (fieldNum === -1) {
+                counter++;
+                fieldNum = counter;
+            } else if (fieldNum > counter) {
+                counter = fieldNum; // Adjust counter if loading fields out of order or if a higher index is found
+            }
 
             var container = document.getElementById('container');
             var fieldGroup = document.createElement('div');
             fieldGroup.className = 'field-group';
-            fieldGroup.id = 'group-' + counter;
+            fieldGroup.id = 'group-' + fieldNum;
 
             fieldGroup.innerHTML = `
-                <div class="field-label">Date ${counter}:</div>
-                <input type="date" class="date-field" name="date_${counter}" onchange="updateData()">
-                <div class="field-label">Text ${counter}:</div>
-                <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
-                <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
+                <div class="field-label">Date:</div>
+                <input type="date" class="date-field" name="date_${fieldNum}" value="${initialDate}" onchange="updateData()">
+                <div class="field-label">Client Notes:</div>
+                <textarea class="text-field" name="notes_${fieldNum}" placeholder="Enter notes here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialNotes}</textarea>
+                <button class="remove-button" onclick="removeGroup('group-${fieldNum}')">Remove</button>
             `;
 
             container.appendChild(fieldGroup);
-            applyButtonColors();
-            updateData();
-            requestResize();
+
+            // Set initial height for textarea if content exists
+            const textarea = fieldGroup.querySelector('.text-field');
+            if (initialNotes) {
+                autoResize(textarea);
+            }
+
+            applyButtonColors(); // Apply colors to newly added remove button
+            updateData(); // Update data model
+            requestResize(); // Request resize after adding a field
         }
 
         function autoResize(textarea) {
-            textarea.style.height = 'auto';
-            const lineHeight = 20;
-            const baseLines = 8;
-            const currentLines = Math.ceil(textarea.scrollHeight / lineHeight);
+            textarea.style.height = 'auto'; // Reset height to recalculate
+            const lineHeight = 20; // Assuming this line height
+            const minHeight = 120; // Minimum height from CSS
+            const currentScrollHeight = textarea.scrollHeight;
 
-            if (currentLines > baseLines) {
-                const additionalLines = Math.ceil((currentLines - baseLines) / 2) * 2;
-                const newHeight = (baseLines + additionalLines) * lineHeight;
-                textarea.style.height = newHeight + 'px';
+            if (currentScrollHeight > minHeight) {
+                textarea.style.height = currentScrollHeight + 'px';
             } else {
-                textarea.style.height = (baseLines * lineHeight) + 'px';
+                textarea.style.height = minHeight + 'px';
             }
-            requestResize();
+            requestResize(); // Always request resize after potential text area height change
         }
 
         function removeGroup(groupId) {
+            const index = parseInt(groupId.replace('group-', '')) - 1; // Get index from ID
+            if (index > -1) {
+                widgetData.splice(index, 1); // Remove from data array
+            }
             document.getElementById(groupId).remove();
+            
+            // Re-render to update IDs and names (important for sequential data storage)
+            // A more efficient way would be to just update the specific elements that changed,
+            // but for simplicity and correctness with IDs after removal, re-rendering might be safer for now.
+            // However, this approach can be problematic if there's complex state.
+            // A better way is to update widgetData, then iterate and update IDs/names in DOM.
+            // For now, let's just remove and update data and let Jotform handle the persistence via sendData.
+            
             updateData();
             requestResize();
         }
 
         function updateData() {
-            const data = {};
-            const dateFields = document.querySelectorAll('.date-field');
-            const textFields = document.querySelectorAll('.text-field');
+            // Rebuild widgetData array based on current DOM elements
+            widgetData = [];
+            const fieldGroups = document.querySelectorAll('.field-group');
+            fieldGroups.forEach((group, index) => {
+                const dateField = group.querySelector('.date-field');
+                const textField = group.querySelector('.text-field');
+                const dateValue = dateField ? dateField.value : '';
+                const textValue = textField ? textField.value : '';
 
-            dateFields.forEach(field => {
-                if (field.value) {
-                    data[field.name] = field.value;
+                // Update name attributes to reflect new sequential indexing
+                dateField.name = `date_${index + 1}`;
+                textField.name = `notes_${index + 1}`;
+                group.id = `group-${index + 1}`;
+
+                if (dateValue || textValue) { // Only add if there's content
+                    widgetData.push({
+                        date: dateValue,
+                        notes: textValue
+                    });
                 }
             });
 
-            textFields.forEach(field => {
-                if (field.value) {
-                    data[field.name] = field.value;
-                }
-            });
-
-            widgetData = data;
+            // Send data to JotForm using sendData method
             JFCustomWidget.sendData({
                 value: JSON.stringify(widgetData)
             });
         }
 
         function requestResize() {
+            // Calculate total height needed
             const body = document.body;
             const html = document.documentElement;
             const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+
+            // Request frame resize, add extra padding for scrollbars/margins
             JFCustomWidget.requestFrameResize({
-                height: height + 20
+                height: height + 30 // Increased padding
             });
         }
     </script>
