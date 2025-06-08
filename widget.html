@@ -93,100 +93,102 @@
         </div>
 
     <script>
-        let fieldCounter = 0;
-        const fieldsContainer = document.getElementById('fields-container');
-        const addButton = document.querySelector('.add-button');
+        // Wrap your entire JavaScript logic in a DOMContentLoaded listener
+        document.addEventListener('DOMContentLoaded', function() {
+            let fieldCounter = 0;
+            const fieldsContainer = document.getElementById('fields-container');
+            const addButton = document.querySelector('.add-button');
 
-        function createFieldGroup(dateValue = '', textValue = '') {
-            fieldCounter++;
-            const fieldGroup = document.createElement('div');
-            fieldGroup.className = 'field-group';
-            fieldGroup.dataset.id = fieldCounter; // Assign a unique ID to the group
+            function createFieldGroup(dateValue = '', textValue = '') {
+                fieldCounter++;
+                const fieldGroup = document.createElement('div');
+                fieldGroup.className = 'field-group';
+                fieldGroup.dataset.id = fieldCounter; // Assign a unique ID to the group
 
-            fieldGroup.innerHTML = `
-                <label for="date_${fieldCounter}" class="label">Date ${fieldCounter}:</label>
-                <input type="date" id="date_${fieldCounter}" class="date-field" value="${dateValue}">
+                fieldGroup.innerHTML = `
+                    <label for="date_${fieldCounter}" class="label">Date ${fieldCounter}:</label>
+                    <input type="date" id="date_${fieldCounter}" class="date-field" value="${dateValue}">
 
-                <label for="text_${fieldCounter}" class="label">Text ${fieldCounter}:</label>
-                <textarea id="text_${fieldCounter}" class="text-field">${textValue}</textarea>
+                    <label for="text_${fieldCounter}" class="label">Text ${fieldCounter}:</label>
+                    <textarea id="text_${fieldCounter}" class="text-field">${textValue}</textarea>
 
-                <button type="button" class="remove-button">Remove</button>
-            `;
+                    <button type="button" class="remove-button">Remove</button>
+                `;
 
-            const removeButton = fieldGroup.querySelector('.remove-button');
-            removeButton.onclick = function() {
-                fieldGroup.remove();
-                updateWidgetValue(); // Update data after removing a field group
-                requestResize();
-            };
+                const removeButton = fieldGroup.querySelector('.remove-button');
+                removeButton.onclick = function() {
+                    fieldGroup.remove();
+                    updateWidgetValue(); // Update data after removing a field group
+                    requestResize();
+                };
 
-            const dateField = fieldGroup.querySelector('.date-field');
-            dateField.onchange = updateWidgetValue;
+                const dateField = fieldGroup.querySelector('.date-field');
+                dateField.onchange = updateWidgetValue;
 
-            const textField = fieldGroup.querySelector('.text-field');
-            textField.oninput = function() { // Use oninput for textareas
-                updateWidgetValue();
-                requestResize(); // Request resize on every input to adjust for growing text
-            };
+                const textField = fieldGroup.querySelector('.text-field');
+                textField.oninput = function() { // Use oninput for textareas
+                    updateWidgetValue();
+                    requestResize(); // Request resize on every input to adjust for growing text
+                };
 
-            fieldsContainer.appendChild(fieldGroup);
-            requestResize(); // Request resize after adding a new field group
-        }
-
-        function updateWidgetValue() {
-            const data = {};
-            document.querySelectorAll('.field-group').forEach(group => {
-                const id = group.dataset.id;
-                const dateField = group.querySelector('.date-field');
-                const textField = group.querySelector('.text-field');
-                data[`date_${id}`] = dateField ? dateField.value : '';
-                data[`text_${id}`] = textField ? textField.value : '';
-            });
-            JFCustomWidget.setValue(data);
-        }
-
-        function requestResize() {
-            // Changed to use document.documentElement.scrollHeight for more robust height calculation
-            const height = document.documentElement.scrollHeight;
-            JFCustomWidget.requestFrameResize({ height: height + 80 }); // Increased padding
-        }
-
-        // Initialize with one field group on load
-        createFieldGroup();
-        updateWidgetValue(); // Set initial empty value
-
-        addButton.onclick = function() {
-            createFieldGroup();
-            updateWidgetValue(); // Update data after adding a new field group
-        };
-
-        // Handle initial widget value if loaded from Jotform
-        JFCustomWidget.getValue(function(value) {
-            if (value && Object.keys(value).length > 0) {
-                // Clear existing initial field
-                fieldsContainer.innerHTML = '';
-                // Populate fields from saved value
-                const keys = Object.keys(value).sort((a, b) => {
-                    const idA = parseInt(a.split('_')[1]);
-                    const idB = parseInt(b.split('_')[1]);
-                    return idA - idB;
-                });
-
-                const fieldGroupData = {};
-                keys.forEach(key => {
-                    const [type, id] = key.split('_');
-                    if (!fieldGroupData[id]) {
-                        fieldGroupData[id] = {};
-                    }
-                    fieldGroupData[id][type] = value[key];
-                });
-
-                Object.values(fieldGroupData).forEach(data => {
-                    createFieldGroup(data.date, data.text);
-                });
-                updateWidgetValue(); // Update data after populating
+                fieldsContainer.appendChild(fieldGroup);
+                requestResize(); // Request resize after adding a new field group
             }
-        });
+
+            function updateWidgetValue() {
+                const data = {};
+                document.querySelectorAll('.field-group').forEach(group => {
+                    const id = group.dataset.id;
+                    const dateField = group.querySelector('.date-field');
+                    const textField = group.querySelector('.text-field');
+                    data[`date_${id}`] = dateField ? dateField.value : '';
+                    data[`text_${id}`] = textField ? textField.value : '';
+                });
+                JFCustomWidget.setValue(data);
+            }
+
+            function requestResize() {
+                const height = document.documentElement.scrollHeight;
+                JFCustomWidget.requestFrameResize({ height: height + 80 }); // Increased padding
+            }
+
+            // Initialize with one field group on load
+            createFieldGroup();
+            updateWidgetValue(); // Set initial empty value
+
+            addButton.onclick = function() {
+                createFieldGroup();
+                updateWidgetValue(); // Update data after adding a new field group
+            };
+
+            // Handle initial widget value if loaded from Jotform
+            JFCustomWidget.getValue(function(value) {
+                if (value && Object.keys(value).length > 0) {
+                    // Clear existing initial field
+                    fieldsContainer.innerHTML = '';
+                    // Populate fields from saved value
+                    const keys = Object.keys(value).sort((a, b) => {
+                        const idA = parseInt(a.split('_')[1]);
+                        const idB = parseInt(b.split('_')[1]);
+                        return idA - idB;
+                    });
+
+                    const fieldGroupData = {};
+                    keys.forEach(key => {
+                        const [type, id] = key.split('_');
+                        if (!fieldGroupData[id]) {
+                            fieldGroupData[id] = {};
+                        }
+                        fieldGroupData[id][type] = value[key];
+                    });
+
+                    Object.values(fieldGroupData).forEach(data => {
+                        createFieldGroup(data.date, data.text);
+                    });
+                    updateWidgetValue(); // Update data after populating
+                }
+            });
+        }); // End of DOMContentLoaded listener
     </script>
 </body>
 </html>
