@@ -24,6 +24,7 @@ function createFieldGroup(dateValue = '', textValue = '') {
 
     const removeButton = fieldGroup.querySelector('.remove-button');
     removeButton.onclick = function() {
+        console.log('Remove button clicked inside field group.'); // Debug log
         fieldGroup.remove();
         updateWidgetValue();
         requestResize();
@@ -40,6 +41,7 @@ function createFieldGroup(dateValue = '', textValue = '') {
 
     fieldsContainer.appendChild(fieldGroup);
     requestResize();
+    console.log('New field group added and resize requested.'); // Debug log
 }
 
 function updateWidgetValue() {
@@ -54,8 +56,9 @@ function updateWidgetValue() {
     // Check if JFCustomWidget is defined before using it
     if (typeof JFCustomWidget !== 'undefined') {
         JFCustomWidget.setValue(data);
+        console.log('Widget value updated.'); // Debug log
     } else {
-        console.error('JFCustomWidget is not defined in updateWidgetValue!');
+        console.error('JFCustomWidget is NOT defined in updateWidgetValue!'); // Critical error log
     }
 }
 
@@ -64,30 +67,37 @@ function requestResize() {
     // Check if JFCustomWidget is defined before using it
     if (typeof JFCustomWidget !== 'undefined') {
         JFCustomWidget.requestFrameResize({ height: height + 80 });
+        console.log('Resize request sent. Height:', height + 80); // Debug log
     } else {
-        console.error('JFCustomWidget is not defined in requestResize!');
+        console.error('JFCustomWidget is NOT defined in requestResize!'); // Critical error log
     }
 }
 
-// Initial setup to run once Jotform is ready
-// This is typically how Jotform expects widget initialization.
-// We'll add a check for JFCustomWidget just in case, but it should be available.
+// Event listener for messages from the parent frame (Jotform)
+console.log('Adding message event listener.'); // Debug log
 window.addEventListener('message', function(e) {
+    console.log('Message received. Origin:', e.origin, 'Type:', e.data.type); // Debug log: Check ALL messages
+
+    // ONLY proceed if the message is from Jotform AND indicates widget readiness
     if (e.origin.startsWith('https://www.jotform.com') && e.data.type === 'widgetReady') {
-        console.log('Jotform widgetReady message received.');
+        console.log('Jotform widgetReady message received and processed!'); // Critical debug log
+
         // Initialize with one field group on load
         createFieldGroup();
         updateWidgetValue();
 
+        // Attach click handler to the add button
         addButton.onclick = function() {
+            console.log('Add button clicked!'); // Debug log
             createFieldGroup();
             updateWidgetValue();
         };
+        console.log('Add button click handler attached.'); // Debug log
 
         // Handle initial widget value if loaded from Jotform
         if (typeof JFCustomWidget !== 'undefined') {
             JFCustomWidget.getValue(function(value) {
-                console.log('JFCustomWidget.getValue called. Value:', value);
+                console.log('JFCustomWidget.getValue called. Initial value:', value); // Debug log
                 if (value && Object.keys(value).length > 0) {
                     fieldsContainer.innerHTML = '';
                     const keys = Object.keys(value).sort((a, b) => {
@@ -112,7 +122,8 @@ window.addEventListener('message', function(e) {
                 }
             });
         } else {
-            console.error('JFCustomWidget is not defined when trying to getValue.');
+            console.error('JFCustomWidget is NOT defined when trying to getValue during initialization!'); // Critical error log
         }
+        console.log('Widget initialization complete via widgetReady message.'); // Debug log
     }
 });
