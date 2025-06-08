@@ -1,246 +1,193 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <script src="//js.jotform.com/JotformCustomWidget.min.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Helvetica, Arial, sans-serif; /* Changed to Helvetica with Arial as fallback */
             padding: 10px;
             margin: 0;
-        }
-
-        .add-button,
-        .remove-button {
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            cursor: pointer;
-            border-radius: 4px;
-            font-size: 14px;
-            margin-bottom: 15px;
-            background-color: #666666;
-        }
-
-        .add-button {
-            /* Color will be set dynamically by settingsRead */
+            overflow: hidden; /* Prevent body scrollbars */
         }
 
         .field-group {
-            /* Removed the border to get rid of the gray box */
+            border: 1px solid #ddd;
             padding: 15px;
-            margin: 10px 0;
-            /* Added padding to prevent removal button from going outside field-group margin */
-            padding-bottom: 25px; 
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            position: relative; /* For positioning the remove button */
+            padding-bottom: 25px; /* Give space for the remove button */
+        }
+
+        .label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .date-field,
+        .text-field {
+            display: block;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #ccc;
             border-radius: 4px;
-            background: #f9f9f9; /* Keep background to distinguish groups */
-            position: relative;
+            box-sizing: border-box; /* Ensures padding is included in width */
+            font-size: 14px;
+            line-height: 1.5;
         }
 
         .date-field {
-            width: 120px;
-            padding: 6px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin: 5px 0;
-            font-family: Helvetica, Arial, sans-serif; /* Helvetica for date */
+            width: calc(100% - 22px); /* Adjust width to fit icon/padding if date picker is there */
+            max-width: 180px; /* Constrain date field width */
         }
 
         .text-field {
-            width: 700px; /* Increased width */
-            max-width: 100%;
-            min-height: 120px;
-            padding: 6px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-family: Arial, sans-serif;
-            resize: none;
-            overflow: hidden;
-            line-height: 1.4;
-            box-sizing: border-box;
+            width: 100%; /* Make it fill its container */
+            /* This is the defensive design change: set max-width to accommodate Jotform's iframe constraints */
+            max-width: 370px; /* ADJUST THIS VALUE if needed. Based on observed Jotform container widths like 380px or 290px */
+            min-height: 100px; /* For textarea */
+            resize: vertical; /* Allows user to resize vertically */
+            overflow: auto; /* Adds scrollbar if content overflows vertically */
+        }
+
+        .add-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+            display: block; /* Make it a block element to take full width if desired */
+            width: fit-content; /* Adjust to content width */
+        }
+
+        .add-button:hover {
+            background-color: #45a049;
         }
 
         .remove-button {
-            font-size: 12px;
+            background-color: #f44336;
+            color: white;
             padding: 5px 10px;
             border: none;
-            cursor: pointer;
             border-radius: 4px;
-            position: absolute;
-            bottom: 5px; /* Adjusted to be within the padding of field-group */
-            left: 15px; /* Aligned with left padding of field-group */
-            margin-bottom: 0;
+            cursor: pointer;
+            font-size: 12px;
+            position: absolute; /* Position relative to .field-group */
+            bottom: 5px;
+            left: 15px; /* Adjust as needed */
         }
 
-        .field-label {
-            font-weight: normal; /* Changed to normal from bold as per previous discussion, if not please let me know */
-            margin: 5px 0;
+        .remove-button:hover {
+            background-color: #da190b;
         }
     </style>
 </head>
-
 <body>
-    <button class="add-button" onclick="addDateTextField()">Add Date + Text Field</button>
-    <div id="container"></div>
+    <button type="button" class="add-button">Add Date + Text Field</button>
+    <div id="fields-container">
+        </div>
 
     <script>
-        let counter = 0;
-        let widgetData = []; // Changed to array for better PDF rendering
-        let addButtonColor = '#666666'; // Default darker gray
-        let removeButtonColor = '#666666'; // Default darker gray
+        let fieldCounter = 0;
+        const fieldsContainer = document.getElementById('fields-container');
+        const addButton = document.querySelector('.add-button');
 
-        // Always subscribe to ready event
-        JFCustomWidget.subscribe("ready", function(data) {
-            if (data && data.value) {
-                try {
-                    widgetData = JSON.parse(data.value);
-                    if (Array.isArray(widgetData)) {
-                        widgetData.forEach((entry, index) => {
-                            addDateTextField(entry.date, entry.notes, index + 1); // Pass existing data to recreate fields
-                        });
-                        counter = widgetData.length; // Set counter to the number of existing entries
-                    } else {
-                        widgetData = []; // Initialize as array if no valid data
-                    }
-                } catch (e) {
-                    widgetData = []; // Initialize as empty array on error
-                }
-            } else {
-                widgetData = []; // Initialize as empty array if no data
-            }
-            requestResize(); // Ensure correct initial size
-        });
-
-        // Subscribe to settings read event
-        JFCustomWidget.subscribe("settingsRead", function(data) {
-            addButtonColor = data.addButtonColor || '#666666';
-            removeButtonColor = data.removeButtonColor || '#666666';
-            applyButtonColors();
-            requestResize();
-        });
-
-        function applyButtonColors() {
-            const addButtons = document.querySelectorAll('.add-button');
-            addButtons.forEach(button => {
-                button.style.backgroundColor = addButtonColor;
-            });
-
-            const removeButtons = document.querySelectorAll('.remove-button');
-            removeButtons.forEach(button => {
-                button.style.backgroundColor = removeButtonColor;
-            });
-        }
-
-        // Subscribe to submit event
-        JFCustomWidget.subscribe("submit", function() {
-            updateData(); // Ensure data is up-to-date before sending
-            var result = {
-                valid: true,
-                value: JSON.stringify(widgetData)
-            };
-            JFCustomWidget.sendSubmit(result);
-        });
-
-        function addDateTextField(initialDate = '', initialNotes = '', fieldNum = -1) {
-            if (fieldNum === -1) {
-                counter++;
-                fieldNum = counter;
-            } else if (fieldNum > counter) {
-                counter = fieldNum;
-            }
-
-            var container = document.getElementById('container');
-            var fieldGroup = document.createElement('div');
+        function createFieldGroup(dateValue = '', textValue = '') {
+            fieldCounter++;
+            const fieldGroup = document.createElement('div');
             fieldGroup.className = 'field-group';
-            fieldGroup.id = 'group-' + fieldNum;
+            fieldGroup.dataset.id = fieldCounter; // Assign a unique ID to the group
 
             fieldGroup.innerHTML = `
-                <div class="field-label">Date:</div>
-                <input type="date" class="date-field" name="date_${fieldNum}" value="${initialDate}" onchange="updateData()">
-                <div class="field-label">Client Notes:</div>
-                <textarea class="text-field" name="notes_${fieldNum}" placeholder="Enter notes here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialNotes}</textarea>
-                <button class="remove-button" onclick="removeGroup('group-${fieldNum}')">Remove</button>
+                <label for="date_${fieldCounter}" class="label">Date ${fieldCounter}:</label>
+                <input type="date" id="date_${fieldCounter}" class="date-field" value="${dateValue}">
+
+                <label for="text_${fieldCounter}" class="label">Text ${fieldCounter}:</label>
+                <textarea id="text_${fieldCounter}" class="text-field">${textValue}</textarea>
+
+                <button type="button" class="remove-button">Remove</button>
             `;
 
-            container.appendChild(fieldGroup);
+            const removeButton = fieldGroup.querySelector('.remove-button');
+            removeButton.onclick = function() {
+                fieldGroup.remove();
+                updateWidgetValue(); // Update data after removing a field group
+                requestResize();
+            };
 
-            const textarea = fieldGroup.querySelector('.text-field');
-            if (initialNotes) {
-                autoResize(textarea);
-            }
+            const dateField = fieldGroup.querySelector('.date-field');
+            dateField.onchange = updateWidgetValue;
 
-            applyButtonColors();
-            updateData();
-            requestResize();
+            const textField = fieldGroup.querySelector('.text-field');
+            textField.oninput = function() { // Use oninput for textareas
+                updateWidgetValue();
+                requestResize(); // Request resize on every input to adjust for growing text
+            };
+
+            fieldsContainer.appendChild(fieldGroup);
+            requestResize(); // Request resize after adding a new field group
         }
 
-        function autoResize(textarea) {
-            textarea.style.height = 'auto';
-            const lineHeight = 20;
-            const minHeight = 120;
-            const currentScrollHeight = textarea.scrollHeight;
-
-            if (currentScrollHeight > minHeight) {
-                textarea.style.height = currentScrollHeight + 'px';
-            } else {
-                textarea.style.height = minHeight + 'px';
-            }
-            requestResize(); // Always request resize after potential text area height change
-        }
-
-        function removeGroup(groupId) {
-            const index = Array.from(document.querySelectorAll('.field-group')).findIndex(group => group.id === groupId);
-            if (index > -1) {
-                widgetData.splice(index, 1);
-            }
-            document.getElementById(groupId).remove();
-            
-            updateData(); 
-            requestResize();
-        }
-
-        function updateData() {
-            widgetData = [];
-            const fieldGroups = document.querySelectorAll('.field-group');
-            fieldGroups.forEach((group, index) => {
+        function updateWidgetValue() {
+            const data = {};
+            document.querySelectorAll('.field-group').forEach(group => {
+                const id = group.dataset.id;
                 const dateField = group.querySelector('.date-field');
                 const textField = group.querySelector('.text-field');
-                const dateValue = dateField ? dateField.value : '';
-                const textValue = textField ? textField.value : '';
-
-                if (dateField) dateField.name = `date_${index + 1}`;
-                if (textField) textField.name = `notes_${index + 1}`;
-                group.id = `group-${index + 1}`;
-                
-                const dateLabel = group.querySelector('.field-label:nth-of-type(1)');
-                if (dateLabel) dateLabel.textContent = `Date:`; 
-
-                const textLabel = group.querySelector('.field-label:nth-of-type(2)');
-                if (textLabel) textLabel.textContent = `Client Notes:`; 
-
-                if (dateValue || textValue) {
-                    widgetData.push({
-                        date: dateValue,
-                        notes: textValue
-                    });
-                }
+                data[`date_${id}`] = dateField ? dateField.value : '';
+                data[`text_${id}`] = textField ? textField.value : '';
             });
-
-            JFCustomWidget.sendData({
-                value: JSON.stringify(widgetData)
-            });
+            JFCustomWidget.setValue(data);
         }
 
         function requestResize() {
             const body = document.body;
-            const html = document.documentElement;
-            const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
-            
-            JFCustomWidget.requestFrameResize({
-                height: height + 60 // Increased padding
-            });
+            // Get the scrollHeight of the body to include all content
+            const height = body.scrollHeight;
+            JFCustomWidget.requestFrameResize({ height: height + 60 }); // Increased padding
         }
+
+        // Initialize with one field group on load
+        createFieldGroup();
+        updateWidgetValue(); // Set initial empty value
+
+        addButton.onclick = function() {
+            createFieldGroup();
+            updateWidgetValue(); // Update data after adding a new field group
+        };
+
+        // Handle initial widget value if loaded from Jotform
+        JFCustomWidget.getValue(function(value) {
+            if (value && Object.keys(value).length > 0) {
+                // Clear existing initial field
+                fieldsContainer.innerHTML = '';
+                // Populate fields from saved value
+                const keys = Object.keys(value).sort((a, b) => {
+                    const idA = parseInt(a.split('_')[1]);
+                    const idB = parseInt(b.split('_')[1]);
+                    return idA - idB;
+                });
+
+                const fieldGroupData = {};
+                keys.forEach(key => {
+                    const [type, id] = key.split('_');
+                    if (!fieldGroupData[id]) {
+                        fieldGroupData[id] = {};
+                    }
+                    fieldGroupData[id][type] = value[key];
+                });
+
+                Object.values(fieldGroupData).forEach(data => {
+                    createFieldGroup(data.date, data.text);
+                });
+                updateWidgetValue(); // Update data after populating
+            }
+        });
     </script>
 </body>
-
 </html>
