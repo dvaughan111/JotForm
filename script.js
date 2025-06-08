@@ -1,8 +1,7 @@
 // Global variables
 let fieldCounter = 0;
-let fieldsContainer;
-let addButton;
-let widgetInitialized = false; // Flag to prevent multiple initializations
+let fieldsContainer; // Will be assigned on successful initialization
+let addButton;     // Will be assigned on successful initialization
 
 function createFieldGroup(dateValue = '', textValue = '') {
     fieldCounter++;
@@ -38,7 +37,7 @@ function createFieldGroup(dateValue = '', textValue = '') {
     };
 
     fieldsContainer.appendChild(fieldGroup);
-    requestResize();
+    requestResize(); // Call resize immediately after adding to ensure correct height
     console.log('New field group added and resize requested.');
 }
 
@@ -51,121 +50,62 @@ function updateWidgetValue() {
         data[`date_${id}`] = dateField ? dateField.value : '';
         data[`text_${id}`] = textField ? textField.value : '';
     });
+    // Only attempt to use JFCustomWidget if it's defined
     if (typeof JFCustomWidget !== 'undefined') {
         JFCustomWidget.setValue(data);
         console.log('Widget value updated.');
     } else {
-        console.error('JFCustomWidget is NOT defined in updateWidgetValue! (Still a problem)');
+        console.warn('JFCustomWidget is NOT defined when trying to update value. This might be a temporary race condition during initial load.');
     }
 }
 
 function requestResize() {
     const height = document.documentElement.scrollHeight;
+    // Only attempt to use JFCustomWidget if it's defined
     if (typeof JFCustomWidget !== 'undefined') {
         JFCustomWidget.requestFrameResize({ height: height + 80 });
         console.log('Resize request sent. Height:', height + 80);
     } else {
-        console.error('JFCustomWidget is NOT defined in requestResize! (Still a problem)');
+        console.warn('JFCustomWidget is NOT defined when trying to resize. This might be a temporary race condition during initial load.');
     }
 }
 
-// *** REVISED INITIALIZATION STRATEGY ***
-// Wait for any message from Jotform, then check for JFCustomWidget
-console.log('script.js loaded. Listening for Jotform messages...');
+// *** THE CORE INITIALIZATION LOGIC (modified to be more robust) ***
+function initializeWidget() {
+    console.log('Attempting to initialize widget...');
 
-window.addEventListener('message', function(e) {
-    // Log all incoming messages to debug what Jotform is sending
-    console.log('Message received from parent. Origin:', e.origin, 'Data:', e.data);
+    // Assign DOM elements - these should be available now due to script placement in body
+    fieldsContainer = document.getElementById('fields-container');
+    addButton = document.querySelector('.add-button');
 
-    // Only proceed if the message is from Jotform AND we haven't initialized yet
-    if (e.origin.startsWith('https://www.jotform.com') && typeof JFCustomWidget !== 'undefined' && !widgetInitialized) {
-        console.log('Jotform message received, JFCustomWidget is defined. Initializing widget.');
-        widgetInitialized = true; // Set flag to prevent re-initialization
-
-        // Get references to the DOM elements
-        fieldsContainer = document.getElementById('fields-container');
-        addButton = document.querySelector('.add-button');
-
-        if (!fieldsContainer || !addButton) {
-            console.error('Error: fields-container or add-button not found. Widget initialization failed.');
-            return;
-        }
-
-        // Initialize with one field group on load
-        createFieldGroup();
-        updateWidgetValue();
-
-        // Attach click handler to the add button
-        addButton.onclick = function() {
-            console.log('Add button clicked!');
-            createFieldGroup();
-            updateWidgetValue();
-        };
-        console.log('Add button click handler attached.');
-
-        // Handle initial widget value if loaded from Jotform
-        JFCustomWidget.getValue(function(value) {
-            console.log('JFCustomWidget.getValue called. Initial value:', value);
-            if (value && Object.keys(value).length > 0) {
-                fieldsContainer.innerHTML = '';
-                const keys = Object.keys(value).sort((a, b) => {
-                    const idA = parseInt(a.split('_')[1]);
-                    const idB = parseInt(b.split('_')[1]);
-                    return idA - idB;
-                });
-
-                const fieldGroupData = {};
-                keys.forEach(key => {
-                    const [type, id] = key.split('_');
-                    if (!fieldGroupData[id]) {
-                        fieldGroupData[id] = {};
-                    }
-                    fieldGroupData[id][type] = value[key];
-                });
-
-                Object.values(fieldGroupData).forEach(data => {
-                    createFieldGroup(data.date, data.text);
-                });
-                updateWidgetValue();
-            }
-        });
-        console.log('Widget fully initialized.');
+    if (!fieldsContainer || !addButton) {
+        console.error('Error: fields-container or add-button not found in DOM. Widget initialization failed.');
+        return; // Exit if critical DOM elements are missing
     }
-});
 
-// Fallback: If no message is received or JFCustomWidget isn't defined through message,
-// try a small delay after DOMContentLoaded to ensure elements are there.
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOMContentLoaded fired. Preparing for potential fallback initialization.');
-    // If widget hasn't been initialized by message listener within a short time, try initializing
-    // This provides a safety net if the message listener somehow misses the event or JFCustomWidget isn't ready immediately after the message.
-    setTimeout(function() {
-        if (!widgetInitialized && typeof JFCustomWidget !== 'undefined') {
-            console.warn('Fallback initialization: JFCustomWidget defined but no message-based init occurred. Proceeding with DOMContentLoaded fallback.');
-            // Re-run the initialization logic. This part is a bit redundant but acts as a robust fallback.
-            // In a production app, you'd refactor initialization into a single callable function.
-            fieldsContainer = document.getElementById('fields-container');
-            addButton = document.querySelector('.add-button');
+    // Attach click handler to the add button FIRST, as it's purely DOM-based
+    addButton.onclick = function() {
+        console.log('Add button clicked!');
+        createFieldGroup(); // createFieldGroup calls updateWidgetValue and requestResize internally
+    };
+    console.log('Add button click handler attached.');
 
-            if (!fieldsContainer || !addButton) {
-                console.error('Fallback Error: fields-container or add-button not found.');
-                return;
-            }
-            createFieldGroup();
-            updateWidgetValue();
-            addButton.onclick = function() {
-                console.log('Add button clicked! (Fallback Init)');
-                createFieldGroup();
-                updateWidgetValue();
-            };
+    // Now, wait for JFCustomWidget before doing anything that relies on it
+    function waitForJFCustomWidget() {
+        if (typeof JFCustomWidget !== 'undefined') {
+            console.log('JFCustomWidget is defined. Proceeding with Jotform API calls.');
+
+            // Initialize with one field group on load if no data exists
             JFCustomWidget.getValue(function(value) {
+                console.log('JFCustomWidget.getValue called. Initial value:', value);
                 if (value && Object.keys(value).length > 0) {
-                    fieldsContainer.innerHTML = '';
+                    fieldsContainer.innerHTML = ''; // Clear the initial field if data is loaded
                     const keys = Object.keys(value).sort((a, b) => {
                         const idA = parseInt(a.split('_')[1]);
                         const idB = parseInt(b.split('_')[1]);
                         return idA - idB;
                     });
+
                     const fieldGroupData = {};
                     keys.forEach(key => {
                         const [type, id] = key.split('_');
@@ -174,16 +114,36 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         fieldGroupData[id][type] = value[key];
                     });
+
                     Object.values(fieldGroupData).forEach(data => {
                         createFieldGroup(data.date, data.text);
                     });
-                    updateWidgetValue();
+                } else {
+                    // Only create initial field if no existing data was loaded
+                    createFieldGroup();
                 }
+                updateWidgetValue(); // Ensure initial state is pushed to Jotform
             });
-            console.log('Widget fallback initialization complete.');
-            widgetInitialized = true; // Mark as initialized
-        } else if (!widgetInitialized) {
-             console.log('Fallback not triggered: JFCustomWidget still undefined or widget already initialized.');
+
+            console.log('Jotform API integration complete.');
+        } else {
+            console.warn('JFCustomWidget is not yet defined. Retrying Jotform API integration in 100ms...');
+            setTimeout(waitForJFCustomWidget, 100); // Poll every 100ms
         }
-    }, 500); // Give Jotform some time (0.5 seconds) after DOMContentLoaded
+    }
+
+    // Start waiting for JFCustomWidget
+    waitForJFCustomWidget();
+
+    console.log('Widget DOM setup complete. Waiting for JFCustomWidget API.');
+}
+
+
+// Start the entire initialization process when the DOM is fully loaded.
+// This ensures that 'fieldsContainer' and 'addButton' elements exist.
+document.addEventListener('DOMContentLoaded', initializeWidget);
+
+// General message listener (mostly for debugging other potential messages from Jotform)
+window.addEventListener('message', function(e) {
+    // console.log('General message received. Origin:', e.origin, 'Data:', e.data);
 });
