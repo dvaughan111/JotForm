@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="https://js.jotform.com/JotformCustomWidget.min.js"></script>
     <style>
         body {
-            font-family: Helvetica, Arial, sans-serif; /* Changed to Helvetica with Arial as fallback */
+            font-family: Helvetica, Arial, sans-serif;
             padding: 10px;
             margin: 0;
-            /* REMOVED: overflow: hidden; -- This was likely causing the cut-off */
         }
 
         .field-group {
@@ -16,8 +14,8 @@
             margin-bottom: 20px;
             border-radius: 8px;
             background-color: #f9f9f9;
-            position: relative; /* For positioning the remove button */
-            padding-bottom: 25px; /* Give space for the remove button */
+            position: relative;
+            padding-bottom: 25px;
         }
 
         .label {
@@ -33,23 +31,22 @@
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            box-sizing: border-box; /* Ensures padding is included in width */
+            box-sizing: border-box;
             font-size: 14px;
             line-height: 1.5;
         }
 
         .date-field {
-            width: calc(100% - 22px); /* Adjust width to fit icon/padding if date picker is there */
-            max-width: 180px; /* Constrain date field width */
+            width: calc(100% - 22px);
+            max-width: 180px;
         }
 
         .text-field {
-            width: 100%; /* Make it fill its container */
-            /* This is the defensive design change: set max-width to accommodate Jotform's iframe constraints */
-            max-width: 370px; /* ADJUST THIS VALUE if needed. Based on observed Jotform container widths like 380px or 290px */
-            min-height: 100px; /* For textarea */
-            resize: vertical; /* Allows user to resize vertically */
-            overflow: auto; /* Adds scrollbar if content overflows vertically */
+            width: 100%;
+            max-width: 370px;
+            min-height: 100px;
+            resize: vertical;
+            overflow: auto;
         }
 
         .add-button {
@@ -61,8 +58,8 @@
             cursor: pointer;
             font-size: 16px;
             margin-bottom: 20px;
-            display: block; /* Make it a block element to take full width if desired */
-            width: fit-content; /* Adjust to content width */
+            display: block;
+            width: fit-content;
         }
 
         .add-button:hover {
@@ -77,9 +74,9 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
-            position: absolute; /* Position relative to .field-group */
+            position: absolute;
             bottom: 5px;
-            left: 15px; /* Adjust as needed */
+            left: 15px;
         }
 
         .remove-button:hover {
@@ -93,102 +90,106 @@
         </div>
 
     <script>
-        // Wrap your entire JavaScript logic in a DOMContentLoaded listener
-        document.addEventListener('DOMContentLoaded', function() {
-            let fieldCounter = 0;
-            const fieldsContainer = document.getElementById('fields-container');
-            const addButton = document.querySelector('.add-button');
+        // Dynamically load the JotformCustomWidget.min.js script
+        const jotformWidgetScript = document.createElement('script');
+        jotformWidgetScript.src = 'https://js.jotform.com/JotformCustomWidget.min.js';
+        jotformWidgetScript.onload = function() {
+            // This entire block will only run AFTER JotformCustomWidget.min.js has loaded
+            document.addEventListener('DOMContentLoaded', function() {
+                let fieldCounter = 0;
+                const fieldsContainer = document.getElementById('fields-container');
+                const addButton = document.querySelector('.add-button');
 
-            function createFieldGroup(dateValue = '', textValue = '') {
-                fieldCounter++;
-                const fieldGroup = document.createElement('div');
-                fieldGroup.className = 'field-group';
-                fieldGroup.dataset.id = fieldCounter; // Assign a unique ID to the group
+                function createFieldGroup(dateValue = '', textValue = '') {
+                    fieldCounter++;
+                    const fieldGroup = document.createElement('div');
+                    fieldGroup.className = 'field-group';
+                    fieldGroup.dataset.id = fieldCounter;
 
-                fieldGroup.innerHTML = `
-                    <label for="date_${fieldCounter}" class="label">Date ${fieldCounter}:</label>
-                    <input type="date" id="date_${fieldCounter}" class="date-field" value="${dateValue}">
+                    fieldGroup.innerHTML = `
+                        <label for="date_${fieldCounter}" class="label">Date ${fieldCounter}:</label>
+                        <input type="date" id="date_${fieldCounter}" class="date-field" value="${dateValue}">
 
-                    <label for="text_${fieldCounter}" class="label">Text ${fieldCounter}:</label>
-                    <textarea id="text_${fieldCounter}" class="text-field">${textValue}</textarea>
+                        <label for="text_${fieldCounter}" class="label">Text ${fieldCounter}:</label>
+                        <textarea id="text_${fieldCounter}" class="text-field">${textValue}</textarea>
 
-                    <button type="button" class="remove-button">Remove</button>
-                `;
+                        <button type="button" class="remove-button">Remove</button>
+                    `;
 
-                const removeButton = fieldGroup.querySelector('.remove-button');
-                removeButton.onclick = function() {
-                    fieldGroup.remove();
-                    updateWidgetValue(); // Update data after removing a field group
+                    const removeButton = fieldGroup.querySelector('.remove-button');
+                    removeButton.onclick = function() {
+                        fieldGroup.remove();
+                        updateWidgetValue();
+                        requestResize();
+                    };
+
+                    const dateField = fieldGroup.querySelector('.date-field');
+                    dateField.onchange = updateWidgetValue;
+
+                    const textField = fieldGroup.querySelector('.text-field');
+                    textField.oninput = function() {
+                        updateWidgetValue();
+                        requestResize();
+                    };
+
+                    fieldsContainer.appendChild(fieldGroup);
                     requestResize();
-                };
-
-                const dateField = fieldGroup.querySelector('.date-field');
-                dateField.onchange = updateWidgetValue;
-
-                const textField = fieldGroup.querySelector('.text-field');
-                textField.oninput = function() { // Use oninput for textareas
-                    updateWidgetValue();
-                    requestResize(); // Request resize on every input to adjust for growing text
-                };
-
-                fieldsContainer.appendChild(fieldGroup);
-                requestResize(); // Request resize after adding a new field group
-            }
-
-            function updateWidgetValue() {
-                const data = {};
-                document.querySelectorAll('.field-group').forEach(group => {
-                    const id = group.dataset.id;
-                    const dateField = group.querySelector('.date-field');
-                    const textField = group.querySelector('.text-field');
-                    data[`date_${id}`] = dateField ? dateField.value : '';
-                    data[`text_${id}`] = textField ? textField.value : '';
-                });
-                JFCustomWidget.setValue(data);
-            }
-
-            function requestResize() {
-                const height = document.documentElement.scrollHeight;
-                JFCustomWidget.requestFrameResize({ height: height + 80 }); // Increased padding
-            }
-
-            // Initialize with one field group on load
-            createFieldGroup();
-            updateWidgetValue(); // Set initial empty value
-
-            addButton.onclick = function() {
-                createFieldGroup();
-                updateWidgetValue(); // Update data after adding a new field group
-            };
-
-            // Handle initial widget value if loaded from Jotform
-            JFCustomWidget.getValue(function(value) {
-                if (value && Object.keys(value).length > 0) {
-                    // Clear existing initial field
-                    fieldsContainer.innerHTML = '';
-                    // Populate fields from saved value
-                    const keys = Object.keys(value).sort((a, b) => {
-                        const idA = parseInt(a.split('_')[1]);
-                        const idB = parseInt(b.split('_')[1]);
-                        return idA - idB;
-                    });
-
-                    const fieldGroupData = {};
-                    keys.forEach(key => {
-                        const [type, id] = key.split('_');
-                        if (!fieldGroupData[id]) {
-                            fieldGroupData[id] = {};
-                        }
-                        fieldGroupData[id][type] = value[key];
-                    });
-
-                    Object.values(fieldGroupData).forEach(data => {
-                        createFieldGroup(data.date, data.text);
-                    });
-                    updateWidgetValue(); // Update data after populating
                 }
-            });
-        }); // End of DOMContentLoaded listener
+
+                function updateWidgetValue() {
+                    const data = {};
+                    document.querySelectorAll('.field-group').forEach(group => {
+                        const id = group.dataset.id;
+                        const dateField = group.querySelector('.date-field');
+                        const textField = group.querySelector('.text-field');
+                        data[`date_${id}`] = dateField ? dateField.value : '';
+                        data[`text_${id}`] = textField ? textField.value : '';
+                    });
+                    JFCustomWidget.setValue(data);
+                }
+
+                function requestResize() {
+                    const height = document.documentElement.scrollHeight;
+                    JFCustomWidget.requestFrameResize({ height: height + 80 });
+                }
+
+                // Initialize with one field group on load
+                createFieldGroup();
+                updateWidgetValue();
+
+                addButton.onclick = function() {
+                    createFieldGroup();
+                    updateWidgetValue();
+                };
+
+                // Handle initial widget value if loaded from Jotform
+                JFCustomWidget.getValue(function(value) {
+                    if (value && Object.keys(value).length > 0) {
+                        fieldsContainer.innerHTML = '';
+                        const keys = Object.keys(value).sort((a, b) => {
+                            const idA = parseInt(a.split('_')[1]);
+                            const idB = parseInt(b.split('_')[1]);
+                            return idA - idB;
+                        });
+
+                        const fieldGroupData = {};
+                        keys.forEach(key => {
+                            const [type, id] = key.split('_');
+                            if (!fieldGroupData[id]) {
+                                fieldGroupData[id] = {};
+                            }
+                            fieldGroupData[id][type] = value[key];
+                        });
+
+                        Object.values(fieldGroupData).forEach(data => {
+                            createFieldGroup(data.date, data.text);
+                        });
+                        updateWidgetValue();
+                    }
+                });
+            }); // End of DOMContentLoaded listener
+        }; // End of jotformWidgetScript.onload
+        document.head.appendChild(jotformWidgetScript); // Append the script to the head
     </script>
 </body>
 </html>
