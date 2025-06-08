@@ -1,10 +1,7 @@
-// Remove all console.logs for now to avoid clutter unless needed for specific debugging
-// No DOMContentLoaded listener here. Jotform often initializes after this.
-// JFCustomWidget should be available globally if Jotform injects it.
-
+// Global variables
 let fieldCounter = 0;
-const fieldsContainer = document.getElementById('fields-container');
-const addButton = document.querySelector('.add-button');
+let fieldsContainer; // Will be assigned on DOMContentLoaded
+let addButton;     // Will be assigned on DOMContentLoaded
 
 function createFieldGroup(dateValue = '', textValue = '') {
     fieldCounter++;
@@ -58,7 +55,7 @@ function updateWidgetValue() {
         JFCustomWidget.setValue(data);
         console.log('Widget value updated.'); // Debug log
     } else {
-        console.error('JFCustomWidget is NOT defined in updateWidgetValue!'); // Critical error log
+        console.error('JFCustomWidget is NOT defined in updateWidgetValue! (This should not happen now)'); // Critical error log
     }
 }
 
@@ -69,61 +66,79 @@ function requestResize() {
         JFCustomWidget.requestFrameResize({ height: height + 80 });
         console.log('Resize request sent. Height:', height + 80); // Debug log
     } else {
-        console.error('JFCustomWidget is NOT defined in requestResize!'); // Critical error log
+        console.error('JFCustomWidget is NOT defined in requestResize! (This should not happen now)'); // Critical error log
     }
 }
 
-// Event listener for messages from the parent frame (Jotform)
-console.log('Adding message event listener.'); // Debug log
-window.addEventListener('message', function(e) {
-    console.log('Message received. Origin:', e.origin, 'Type:', e.data.type); // Debug log: Check ALL messages
+// *** MAIN INITIALIZATION LOGIC ***
+// This runs once the HTML content is fully loaded and parsed.
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded fired. Initializing widget.'); // Debug log
 
-    // ONLY proceed if the message is from Jotform AND indicates widget readiness
-    if (e.origin.startsWith('https://www.jotform.com') && e.data.type === 'widgetReady') {
-        console.log('Jotform widgetReady message received and processed!'); // Critical debug log
+    // Get references to the DOM elements
+    fieldsContainer = document.getElementById('fields-container');
+    addButton = document.querySelector('.add-button');
 
-        // Initialize with one field group on load
+    // Basic error checking in case elements are not found
+    if (!fieldsContainer) {
+        console.error('Error: fields-container not found! Cannot initialize widget.');
+        return; // Stop execution if critical elements are missing
+    }
+    if (!addButton) {
+        console.error('Error: add-button not found! Cannot initialize widget.');
+        return; // Stop execution if critical elements are missing
+    }
+
+    // Initialize with one field group on load
+    createFieldGroup();
+    updateWidgetValue();
+
+    // Attach click handler to the add button
+    addButton.onclick = function() {
+        console.log('Add button clicked!'); // Debug log
         createFieldGroup();
         updateWidgetValue();
+    };
+    console.log('Add button click handler attached.'); // Debug log
 
-        // Attach click handler to the add button
-        addButton.onclick = function() {
-            console.log('Add button clicked!'); // Debug log
-            createFieldGroup();
-            updateWidgetValue();
-        };
-        console.log('Add button click handler attached.'); // Debug log
+    // Handle initial widget value if loaded from Jotform
+    // This part still relies on JFCustomWidget. Since Network tab showed it loading,
+    // it should be available by this point.
+    if (typeof JFCustomWidget !== 'undefined') {
+        JFCustomWidget.getValue(function(value) {
+            console.log('JFCustomWidget.getValue called. Initial value:', value); // Debug log
+            if (value && Object.keys(value).length > 0) {
+                fieldsContainer.innerHTML = ''; // Clear initial field if there's saved data
+                const keys = Object.keys(value).sort((a, b) => {
+                    const idA = parseInt(a.split('_')[1]);
+                    const idB = parseInt(b.split('_')[1]);
+                    return idA - idB;
+                });
 
-        // Handle initial widget value if loaded from Jotform
-        if (typeof JFCustomWidget !== 'undefined') {
-            JFCustomWidget.getValue(function(value) {
-                console.log('JFCustomWidget.getValue called. Initial value:', value); // Debug log
-                if (value && Object.keys(value).length > 0) {
-                    fieldsContainer.innerHTML = '';
-                    const keys = Object.keys(value).sort((a, b) => {
-                        const idA = parseInt(a.split('_')[1]);
-                        const idB = parseInt(b.split('_')[1]);
-                        return idA - idB;
-                    });
+                const fieldGroupData = {};
+                keys.forEach(key => {
+                    const [type, id] = key.split('_');
+                    if (!fieldGroupData[id]) {
+                        fieldGroupData[id] = {};
+                    }
+                    fieldGroupData[id][type] = value[key];
+                });
 
-                    const fieldGroupData = {};
-                    keys.forEach(key => {
-                        const [type, id] = key.split('_');
-                        if (!fieldGroupData[id]) {
-                            fieldGroupData[id] = {};
-                        }
-                        fieldGroupData[id][type] = value[key];
-                    });
-
-                    Object.values(fieldGroupData).forEach(data => {
-                        createFieldGroup(data.date, data.text);
-                    });
-                    updateWidgetValue();
-                }
-            });
-        } else {
-            console.error('JFCustomWidget is NOT defined when trying to getValue during initialization!'); // Critical error log
-        }
-        console.log('Widget initialization complete via widgetReady message.'); // Debug log
+                Object.values(fieldGroupData).forEach(data => {
+                    createFieldGroup(data.date, data.text);
+                });
+                updateWidgetValue();
+            }
+        });
+    } else {
+        // This error should ideally not appear anymore if JotformCustomWidget.min.js loads.
+        console.error('JFCustomWidget is NOT defined when trying to getValue during DOMContentLoaded!'); // Critical error log
     }
+    console.log('Widget initialization complete via DOMContentLoaded.'); // Debug log
+});
+
+// Keeping the general message listener for diagnostic purposes, but it's not crucial for initial setup
+// This will log any other messages Jotform might be sending to the iframe.
+window.addEventListener('message', function(e) {
+    // console.log('General message received. Origin:', e.origin, 'Data:', e.data); // Uncomment if you want to see all messages
 });
