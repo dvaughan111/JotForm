@@ -7,7 +7,7 @@
             font-family: Helvetica, Arial, sans-serif; /* Changed to Helvetica with Arial as fallback */
             padding: 10px;
             margin: 0;
-            overflow: hidden; /* Prevent body scrollbars */
+            /* REMOVED: overflow: hidden; -- This was likely causing the cut-off */
         }
 
         .field-group {
@@ -146,10 +146,9 @@
         }
 
         function requestResize() {
-            const body = document.body;
-            // Get the scrollHeight of the body to include all content
-            const height = body.scrollHeight;
-            JFCustomWidget.requestFrameResize({ height: height + 60 }); // Increased padding
+            // Changed to use document.documentElement.scrollHeight for more robust height calculation
+            const height = document.documentElement.scrollHeight;
+            JFCustomWidget.requestFrameResize({ height: height + 80 }); // Increased padding
         }
 
         // Initialize with one field group on load
