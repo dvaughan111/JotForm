@@ -1,94 +1,213 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <style>
         body {
-            font-family: Helvetica, Arial, sans-serif;
+            font-family: Arial, sans-serif;
             padding: 10px;
             margin: 0;
         }
 
-        .field-group {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-            position: relative;
-            padding-bottom: 25px;
-        }
-
-        .label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            display: block;
-        }
-
-        .date-field,
-        .text-field {
-            display: block;
-            margin-bottom: 10px;
-            padding: 8px;
-            border: 1px solid #ccc;
+        .add-button,
+        .remove-button {
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
             border-radius: 4px;
-            box-sizing: border-box;
             font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .date-field {
-            width: calc(100% - 22px);
-            max-width: 180px;
-        }
-
-        .text-field {
-            width: 100%;
-            max-width: 370px;
-            min-height: 100px;
-            resize: vertical;
-            overflow: auto;
+            margin-bottom: 15px;
+            background-color: #666666;
         }
 
         .add-button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-bottom: 20px;
-            display: block;
-            width: fit-content;
+            /* Color will be set dynamically */
         }
 
-        .add-button:hover {
-            background-color: #45a049;
+        .field-group {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+            position: relative;
+        }
+
+        .date-field {
+            width: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+
+        .text-field-container {
+            position: relative;
+        }
+
+        .text-field {
+            width: 400px;
+            max-width: 100%;
+            min-height: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            resize: none;
+            overflow: hidden;
+            line-height: 1.4;
+            box-sizing: border-box;
         }
 
         .remove-button {
-            background-color: #f44336;
-            color: white;
+            font-size: 12px;
             padding: 5px 10px;
             border: none;
-            border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            border-radius: 4px;
             position: absolute;
             bottom: 5px;
-            left: 15px;
+            left: 0; /* Changed from right to left */
+            margin-bottom: 0;
         }
 
-        .remove-button:hover {
-            background-color: #da190b;
+        .field-label {
+            font-weight: bold;
+            margin: 5px 0;
         }
     </style>
 </head>
-<body>
-    <button type="button" class="add-button">Add Date + Text Field</button>
-    <div id="fields-container">
-        </div>
 
-    <script src="script.js"></script>
+<body>
+    <button class="add-button" onclick="addDateTextField()">Add Date + Text Field</button>
+    <div id="container"></div>
+
+    <script>
+        let counter = 0;
+        let widgetData = {};
+        let addButtonColor = '#666666';
+        let removeButtonColor = '#666666';
+
+        // Always subscribe to ready event
+        JFCustomWidget.subscribe("ready", function(data) {
+            if (data && data.value) {
+                try {
+                    widgetData = JSON.parse(data.value);
+                } catch (e) {
+                    widgetData = {};
+                }
+            }
+        });
+
+        // Subscribe to settings read event
+        JFCustomWidget.subscribe("settingsRead", function(data) {
+            addButtonColor = data.addButtonColor || '#666666';
+            removeButtonColor = data.removeButtonColor || '#666666';
+            applyButtonColors();
+            requestResize();
+        });
+
+        function applyButtonColors() {
+            const addButtons = document.querySelectorAll('.add-button');
+            addButtons.forEach(button => {
+                button.style.backgroundColor = addButtonColor;
+            });
+
+            const removeButtons = document.querySelectorAll('.remove-button');
+            removeButtons.forEach(button => {
+                button.style.backgroundColor = removeButtonColor;
+            });
+        }
+
+        // Subscribe to submit event
+        JFCustomWidget.subscribe("submit", function() {
+            var result = {
+                valid: true,
+                value: JSON.stringify(widgetData)
+            };
+            JFCustomWidget.sendSubmit(result);
+        });
+
+        function addDateTextField() {
+            counter++;
+
+            var container = document.getElementById('container');
+            var fieldGroup = document.createElement('div');
+            fieldGroup.className = 'field-group';
+            fieldGroup.id = 'group-' + counter;
+
+            fieldGroup.innerHTML = `
+                <div class="field-label">Date ${counter}:</div>
+                <input type="date" class="date-field" name="date_${counter}" onchange="updateData()">
+                <div class="field-label">Text ${counter}:</div>
+                <div class="text-field-container">
+                    <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
+                    <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
+                </div>
+            `;
+
+            container.appendChild(fieldGroup);
+            applyButtonColors();
+            updateData();
+            requestResize();
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            const lineHeight = 20;
+            const baseLines = 8;
+            const currentLines = Math.ceil(textarea.scrollHeight / lineHeight);
+
+            if (currentLines > baseLines) {
+                const additionalLines = Math.ceil((currentLines - baseLines) / 2) * 2;
+                const newHeight = (baseLines + additionalLines) * lineHeight;
+                textarea.style.height = newHeight + 'px';
+            } else {
+                textarea.style.height = (baseLines * lineHeight) + 'px';
+            }
+            requestResize();
+        }
+
+        function removeGroup(groupId) {
+            document.getElementById(groupId).remove();
+            updateData();
+            requestResize();
+        }
+
+        function updateData() {
+            const data = {};
+            const dateFields = document.querySelectorAll('.date-field');
+            const textFields = document.querySelectorAll('.text-field');
+
+            dateFields.forEach(field => {
+                if (field.value) {
+                    data[field.name] = field.value;
+                }
+            });
+
+            textFields.forEach(field => {
+                if (field.value) {
+                    data[field.name] = field.value;
+                }
+            });
+
+            widgetData = data;
+            JFCustomWidget.sendData({
+                value: JSON.stringify(widgetData)
+            });
+        }
+
+        function requestResize() {
+            const body = document.body;
+            const html = document.documentElement;
+            const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
+            JFCustomWidget.requestFrameResize({
+                height: height + 20
+            });
+        }
+    </script>
 </body>
+
 </html>
