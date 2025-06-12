@@ -90,6 +90,26 @@
         let addButtonColor = '#666666';
         let removeButtonColor = '#666666';
 
+        // Initialize ResizeObserver
+        const resizeObserver = new ResizeObserver(entries => {
+            // We only need to observe the body's size
+            for (let entry of entries) {
+                if (entry.target === document.body) {
+                    const height = entry.contentRect.height;
+                    // Add a minimal buffer, if necessary, to prevent scrollbars
+                    JFCustomWidget.requestFrameResize({
+                        height: height + 5 
+                    });
+                    // console.log('ResizeObserver triggered. New height:', height + 5);
+                }
+            }
+        });
+
+        // Start observing the body for size changes
+        // This will now handle all resizing, so we remove manual requestResize calls
+        resizeObserver.observe(document.body);
+
+
         // Always subscribe to ready event
         JFCustomWidget.subscribe("ready", function(data) {
             if (data && data.value) {
@@ -118,7 +138,7 @@
                 });
             }
             applyButtonColors();
-            requestResize();
+            // Initial resize handled by ResizeObserver after DOM is rendered
         });
 
         // Subscribe to settings read event
@@ -126,7 +146,7 @@
             addButtonColor = data.addButtonColor || '#666666';
             removeButtonColor = data.removeButtonColor || '#666666';
             applyButtonColors();
-            requestResize();
+            // Resize handled by ResizeObserver
         });
 
         function applyButtonColors() {
@@ -172,8 +192,8 @@
             container.appendChild(fieldGroup);
             applyButtonColors();
             updateData();
-            requestResize();
-
+            // No direct requestResize() call here; ResizeObserver will handle it
+            
             // If loading existing data, apply autoResize immediately to correctly set height
             if (initialText !== '') {
                 const textarea = fieldGroup.querySelector('.text-field');
@@ -193,13 +213,13 @@
             // Set height to scrollHeight, but not less than baseHeight
             textarea.style.height = Math.max(baseHeight, textarea.scrollHeight) + 'px';
             
-            requestResize();
+            // No direct requestResize() call here; ResizeObserver will handle it
         }
 
         function removeGroup(groupId) {
             document.getElementById(groupId).remove();
             updateData();
-            requestResize();
+            // No direct requestResize() call here; ResizeObserver will handle it
         }
 
         function updateData() {
@@ -226,16 +246,7 @@
                 value: JSON.stringify(widgetData)
             });
         }
-
-        function requestResize() {
-            const body = document.body;
-            const html = document.documentElement;
-            // Get the maximum height of the document, accounting for scrollable content
-            const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
-            JFCustomWidget.requestFrameResize({
-                height: height + 5 // Reduced from +20 to +5
-            });
-        }
+        // requestResize function is removed as ResizeObserver takes over its role
     </script>
 </body>
 
