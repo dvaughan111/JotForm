@@ -5,7 +5,7 @@
     <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
     <style>
         body {
-            font-family: Helvetica, sans-serif;
+            font-family: Helvetica, sans-serif; /* Changed to Helvetica as per your provided code */
             padding: 10px;
             margin: 0;
         }
@@ -249,8 +249,10 @@
             fieldGroup.id = 'group-' + id;
 
             fieldGroup.innerHTML = `
-                <div class="field-label">Date:</div> <input type="date" class="date-field" name="date_${id}" value="${initialDate}" onchange="updateData()">
-                <div class="field-label">Notes:</div> <div class="text-field-container">
+                <div class="field-label">Date:</div>
+                <input type="date" class="date-field" name="date_${id}" value="${initialDate}" onchange="updateData()">
+                <div class="field-label">Notes:</div>
+                <div class="text-field-container">
                     <textarea class="text-field" name="text_${id}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialText}</textarea>
                     <button class="remove-button" onclick="removeGroup('group-${id}')">Remove</button>
                 </div>
@@ -298,6 +300,7 @@
 
             // === FORMAT DATA FOR PDF ===
             formattedDataForPDF = formatJsonToLines(widgetData);
+            console.log("Formatted Data for PDF:", formattedDataForPDF); // Debugging line
 
             // === SEND DATA TO JOTFORM ===
             JFCustomWidget.sendData({
