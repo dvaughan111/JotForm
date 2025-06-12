@@ -69,7 +69,7 @@
             border-radius: 4px;
             position: absolute;
             bottom: 5px;
-            left: 0; /* Changed from right to left */
+            left: 0;
             margin-bottom: 0;
         }
 
@@ -99,6 +99,26 @@
                     widgetData = {};
                 }
             }
+            // Create initial field group or load existing data on ready
+            if (Object.keys(widgetData).length === 0) {
+                addDateTextField(); // Create one field if no data is loaded
+            } else {
+                // Assuming data keys are like "date_1", "text_1", "date_2", "text_2" etc.
+                const ids = new Set();
+                Object.keys(widgetData).forEach(key => {
+                    const idMatch = key.match(/_((\d+))$/);
+                    if (idMatch) {
+                        ids.add(parseInt(idMatch[1]));
+                    }
+                });
+
+                const sortedIds = Array.from(ids).sort((a, b) => a - b);
+                sortedIds.forEach(id => {
+                    addDateTextField(widgetData[`date_${id}`] || '', widgetData[`text_${id}`] || '');
+                });
+            }
+            applyButtonColors();
+            requestResize();
         });
 
         // Subscribe to settings read event
@@ -130,7 +150,8 @@
             JFCustomWidget.sendSubmit(result);
         });
 
-        function addDateTextField() {
+        // Modified to accept initial values
+        function addDateTextField(initialDate = '', initialText = '') {
             counter++;
 
             var container = document.getElementById('container');
@@ -140,10 +161,10 @@
 
             fieldGroup.innerHTML = `
                 <div class="field-label">Date ${counter}:</div>
-                <input type="date" class="date-field" name="date_${counter}" onchange="updateData()">
+                <input type="date" class="date-field" name="date_${counter}" value="${initialDate}" onchange="updateData()">
                 <div class="field-label">Text ${counter}:</div>
                 <div class="text-field-container">
-                    <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()"></textarea>
+                    <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialText}</textarea>
                     <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
                 </div>
             `;
@@ -152,21 +173,26 @@
             applyButtonColors();
             updateData();
             requestResize();
+
+            // If loading existing data, apply autoResize immediately to correctly set height
+            if (initialText !== '') {
+                const textarea = fieldGroup.querySelector('.text-field');
+                autoResize(textarea);
+            }
         }
 
         function autoResize(textarea) {
-            textarea.style.height = 'auto';
-            const lineHeight = 20;
-            const baseLines = 8;
-            const currentLines = Math.ceil(textarea.scrollHeight / lineHeight);
-
-            if (currentLines > baseLines) {
-                const additionalLines = Math.ceil((currentLines - baseLines) / 2) * 2;
-                const newHeight = (baseLines + additionalLines) * lineHeight;
-                textarea.style.height = newHeight + 'px';
-            } else {
-                textarea.style.height = (baseLines * lineHeight) + 'px';
-            }
+            textarea.style.height = 'auto'; // Reset height to recalculate scrollHeight
+            const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 20; // Get actual line height
+            const paddingTop = parseFloat(window.getComputedStyle(textarea).paddingTop);
+            const paddingBottom = parseFloat(window.getComputedStyle(textarea).paddingBottom);
+            
+            // Calculate base height needed for min-height and padding
+            const baseHeight = (8 * lineHeight) + paddingTop + paddingBottom; // Assuming 8 lines as base
+            
+            // Set height to scrollHeight, but not less than baseHeight
+            textarea.style.height = Math.max(baseHeight, textarea.scrollHeight) + 'px';
+            
             requestResize();
         }
 
@@ -182,14 +208,16 @@
             const textFields = document.querySelectorAll('.text-field');
 
             dateFields.forEach(field => {
-                if (field.value) {
-                    data[field.name] = field.value;
+                const idMatch = field.name.match(/date_((\d+))$/);
+                if (idMatch) {
+                    data[`date_${idMatch[1]}`] = field.value;
                 }
             });
 
             textFields.forEach(field => {
-                if (field.value) {
-                    data[field.name] = field.value;
+                const idMatch = field.name.match(/text_((\d+))$/);
+                if (idMatch) {
+                    data[`text_${idMatch[1]}`] = field.value;
                 }
             });
 
@@ -202,9 +230,10 @@
         function requestResize() {
             const body = document.body;
             const html = document.documentElement;
+            // Get the maximum height of the document, accounting for scrollable content
             const height = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight);
             JFCustomWidget.requestFrameResize({
-                height: height + 20
+                height: height + 5 // Reduced from +20 to +5
             });
         }
     </script>
