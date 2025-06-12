@@ -86,31 +86,72 @@
 
     <script>
         let counter = 0;
-        let widgetData = {};
+        let widgetData = {}; // This stores the raw date_X, text_X pairs
+        let formattedDataForPDF = ''; // This will store the combined, formatted string for PDF
         let addButtonColor = '#666666';
         let removeButtonColor = '#666666';
 
+        // === UPDATED: Using 'typeA30' as the hidden Jotform field's unique name ===
+        const HIDDEN_JOTFORM_FIELD_NAME = 'typeA30';
+        // ===========================================================================
+
+        // Function to format JSON object into lines with "Date:" and "Notes:"
+        function formatJsonToLines(jsonObj) {
+            let result = '';
+            const ids = new Set();
+
+            // First, gather all unique IDs from the keys (e.g., from 'date_1', 'text_1')
+            for (let key in jsonObj) {
+                if (jsonObj.hasOwnProperty(key)) {
+                    const idMatch = key.match(/_(\d+)$/); // Extract the number at the end
+                    if (idMatch) {
+                        ids.add(parseInt(idMatch[1]));
+                    }
+                }
+            }
+
+            // Sort IDs to ensure consistent order (1, 2, 3...)
+            const sortedIds = Array.from(ids).sort((a, b) => a - b);
+
+            sortedIds.forEach(id => {
+                const date = jsonObj[`date_${id}`] || '';
+                const text = jsonObj[`text_${id}`] || '';
+
+                if (date || text) { // Only add an entry if there's a date or text for this ID
+                    if (date) {
+                        result += `Date: ${date}\n`;
+                    }
+                    if (text) {
+                        result += `Notes: ${text}\n`;
+                    }
+                    result += '---\n'; // Separator after each entry
+                }
+            });
+
+            // Remove the trailing separator if present
+            if (result.endsWith('---\n')) {
+                result = result.slice(0, -4);
+            }
+
+            return result;
+        }
+
+
         // Initialize ResizeObserver
         const resizeObserver = new ResizeObserver(entries => {
-            // We only need to observe the body's size
             for (let entry of entries) {
                 if (entry.target === document.body) {
                     const height = entry.contentRect.height;
-                    // Add a minimal buffer, if necessary, to prevent scrollbars
                     JFCustomWidget.requestFrameResize({
-                        height: height + 5 
+                        height: height + 5
                     });
-                    // console.log('ResizeObserver triggered. New height:', height + 5);
                 }
             }
         });
 
-        // Start observing the body for size changes
-        // This will now handle all resizing, so we remove manual requestResize calls
         resizeObserver.observe(document.body);
 
 
-        // Always subscribe to ready event
         JFCustomWidget.subscribe("ready", function(data) {
             if (data && data.value) {
                 try {
@@ -119,11 +160,10 @@
                     widgetData = {};
                 }
             }
-            // Create initial field group or load existing data on ready
             if (Object.keys(widgetData).length === 0) {
-                addDateTextField(); // Create one field if no data is loaded
+                addDateTextField();
             } else {
-                // Assuming data keys are like "date_1", "text_1", "date_2", "text_2" etc.
+                // Re-populate fields based on widgetData
                 const ids = new Set();
                 Object.keys(widgetData).forEach(key => {
                     const idMatch = key.match(/_((\d+))$/);
@@ -138,15 +178,13 @@
                 });
             }
             applyButtonColors();
-            // Initial resize handled by ResizeObserver after DOM is rendered
+            updateData(); // Initial data send to update PDF field
         });
 
-        // Subscribe to settings read event
         JFCustomWidget.subscribe("settingsRead", function(data) {
             addButtonColor = data.addButtonColor || '#666666';
             removeButtonColor = data.removeButtonColor || '#666666';
             applyButtonColors();
-            // Resize handled by ResizeObserver
         });
 
         function applyButtonColors() {
@@ -161,16 +199,17 @@
             });
         }
 
-        // Subscribe to submit event
         JFCustomWidget.subscribe("submit", function() {
             var result = {
                 valid: true,
-                value: JSON.stringify(widgetData)
+                value: JSON.stringify(widgetData), // On submit, send the current raw widgetData as the main value
+                form: {
+                    [HIDDEN_JOTFORM_FIELD_NAME]: formattedDataForPDF // Send formatted string to hidden field
+                }
             };
             JFCustomWidget.sendSubmit(result);
         });
 
-        // Modified to accept initial values
         function addDateTextField(initialDate = '', initialText = '') {
             counter++;
 
@@ -192,9 +231,7 @@
             container.appendChild(fieldGroup);
             applyButtonColors();
             updateData();
-            // No direct requestResize() call here; ResizeObserver will handle it
-            
-            // If loading existing data, apply autoResize immediately to correctly set height
+
             if (initialText !== '') {
                 const textarea = fieldGroup.querySelector('.text-field');
                 autoResize(textarea);
@@ -202,51 +239,53 @@
         }
 
         function autoResize(textarea) {
-            textarea.style.height = 'auto'; // Reset height to recalculate scrollHeight
-            const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 20; // Get actual line height
+            textarea.style.height = 'auto';
+            const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 20;
             const paddingTop = parseFloat(window.getComputedStyle(textarea).paddingTop);
             const paddingBottom = parseFloat(window.getComputedStyle(textarea).paddingBottom);
-            
-            // Calculate base height needed for min-height and padding
-            const baseHeight = (8 * lineHeight) + paddingTop + paddingBottom; // Assuming 8 lines as base
-            
-            // Set height to scrollHeight, but not less than baseHeight
+
+            const baseHeight = (8 * lineHeight) + paddingTop + paddingBottom;
+
             textarea.style.height = Math.max(baseHeight, textarea.scrollHeight) + 'px';
-            
-            // No direct requestResize() call here; ResizeObserver will handle it
         }
 
         function removeGroup(groupId) {
             document.getElementById(groupId).remove();
             updateData();
-            // No direct requestResize() call here; ResizeObserver will handle it
         }
 
         function updateData() {
-            const data = {};
+            const currentRawData = {};
             const dateFields = document.querySelectorAll('.date-field');
             const textFields = document.querySelectorAll('.text-field');
 
             dateFields.forEach(field => {
                 const idMatch = field.name.match(/date_((\d+))$/);
                 if (idMatch) {
-                    data[`date_${idMatch[1]}`] = field.value;
+                    currentRawData[`date_${idMatch[1]}`] = field.value;
                 }
             });
 
             textFields.forEach(field => {
                 const idMatch = field.name.match(/text_((\d+))$/);
                 if (idMatch) {
-                    data[`text_${idMatch[1]}`] = field.value;
+                    currentRawData[`text_${idMatch[1]}`] = field.value;
                 }
             });
 
-            widgetData = data;
+            widgetData = currentRawData; // Update the main widgetData object
+
+            // === FORMAT DATA FOR PDF USING THE NEW FUNCTION ===
+            formattedDataForPDF = formatJsonToLines(widgetData);
+
+            // === SEND DATA TO JOTFORM ===
             JFCustomWidget.sendData({
-                value: JSON.stringify(widgetData)
+                value: JSON.stringify(widgetData), // Send the raw JSON for internal Jotform storage/submission data
+                form: {
+                    [HIDDEN_JOTFORM_FIELD_NAME]: formattedDataForPDF // Send the formatted string to the specific hidden field
+                }
             });
         }
-        // requestResize function is removed as ResizeObserver takes over its role
     </script>
 </body>
 
