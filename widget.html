@@ -91,11 +91,11 @@
         let addButtonColor = '#666666';
         let removeButtonColor = '#666666';
 
-        // === UPDATED: Using 'typeA30' as the hidden Jotform field's unique name ===
+        // === Using 'typeA30' as the hidden Jotform field's unique name ===
         const HIDDEN_JOTFORM_FIELD_NAME = 'typeA30';
         // ===========================================================================
 
-        // Function to format JSON object into lines with "Date:" and "Notes:"
+        // Function to format JSON object into lines with "Date:" and "Notes:", sorted newest first
         function formatJsonToLines(jsonObj) {
             let result = '';
             const ids = new Set();
@@ -110,8 +110,8 @@
                 }
             }
 
-            // Sort IDs to ensure consistent order (1, 2, 3...)
-            const sortedIds = Array.from(ids).sort((a, b) => a - b);
+            // MODIFIED: Sort IDs in DESCENDING order (newest first)
+            const sortedIds = Array.from(ids).sort((a, b) => b - a);
 
             sortedIds.forEach(id => {
                 const date = jsonObj[`date_${id}`] || '';
@@ -161,7 +161,7 @@
                 }
             }
             if (Object.keys(widgetData).length === 0) {
-                addDateTextField();
+                addDateTextField(); // Add one field if none exist
             } else {
                 // Re-populate fields based on widgetData
                 const ids = new Set();
@@ -172,14 +172,21 @@
                     }
                 });
 
-                const sortedIds = Array.from(ids).sort((a, b) => a - b);
-                sortedIds.forEach(id => {
-                    addDateTextField(widgetData[`date_${id}`] || '', widgetData[`text_${id}`] || '');
+                // When loading existing data, we append them in chronological order
+                // The 'addDateTextField' (for new ones) will prepend.
+                // This ensures existing data maintains its initial visual order relative to each other.
+                const sortedIdsToLoad = Array.from(ids).sort((a, b) => a - b);
+                sortedIdsToLoad.forEach(id => {
+                    appendDateTextField(widgetData[`date_${id}`] || '', widgetData[`text_${id}`] || '');
                 });
+
+                // Ensure counter is updated to prevent ID conflicts with existing data
+                counter = Math.max(0, ...Array.from(ids)) || 0;
             }
             applyButtonColors();
             updateData(); // Initial data send to update PDF field
         });
+
 
         JFCustomWidget.subscribe("settingsRead", function(data) {
             addButtonColor = data.addButtonColor || '#666666';
@@ -210,25 +217,13 @@
             JFCustomWidget.sendSubmit(result);
         });
 
+        // Function to create a new field group (used for new entries - prepends)
         function addDateTextField(initialDate = '', initialText = '') {
             counter++;
-
+            const fieldGroup = createFieldGroup(counter, initialDate, initialText);
             var container = document.getElementById('container');
-            var fieldGroup = document.createElement('div');
-            fieldGroup.className = 'field-group';
-            fieldGroup.id = 'group-' + counter;
+            container.insertBefore(fieldGroup, container.firstChild); // Inserts at the beginning
 
-            fieldGroup.innerHTML = `
-                <div class="field-label">Date ${counter}:</div>
-                <input type="date" class="date-field" name="date_${counter}" value="${initialDate}" onchange="updateData()">
-                <div class="field-label">Text ${counter}:</div>
-                <div class="text-field-container">
-                    <textarea class="text-field" name="text_${counter}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialText}</textarea>
-                    <button class="remove-button" onclick="removeGroup('group-${counter}')">Remove</button>
-                </div>
-            `;
-
-            container.appendChild(fieldGroup);
             applyButtonColors();
             updateData();
 
@@ -237,6 +232,35 @@
                 autoResize(textarea);
             }
         }
+
+        // Helper function for initial loading (appends to maintain original order of loaded data)
+        function appendDateTextField(initialDate = '', initialText = '') {
+            const fieldGroup = createFieldGroup(counter + 1, initialDate, initialText); // Use counter + 1 for correct ID
+            var container = document.getElementById('container');
+            container.appendChild(fieldGroup); // Appends to the end for initial load
+
+            applyButtonColors(); // Apply colors just in case
+            // No updateData() or autoResize() call here, as updateData() is called once after all data is loaded
+        }
+
+        // Helper function to create the field group HTML element
+        function createFieldGroup(id, initialDate = '', initialText = '') {
+            var fieldGroup = document.createElement('div');
+            fieldGroup.className = 'field-group';
+            fieldGroup.id = 'group-' + id;
+
+            fieldGroup.innerHTML = `
+                <div class="field-label">Date ${id}:</div>
+                <input type="date" class="date-field" name="date_${id}" value="${initialDate}" onchange="updateData()">
+                <div class="field-label">Text ${id}:</div>
+                <div class="text-field-container">
+                    <textarea class="text-field" name="text_${id}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialText}</textarea>
+                    <button class="remove-button" onclick="removeGroup('group-${id}')">Remove</button>
+                </div>
+            `;
+            return fieldGroup;
+        }
+
 
         function autoResize(textarea) {
             textarea.style.height = 'auto';
@@ -275,7 +299,7 @@
 
             widgetData = currentRawData; // Update the main widgetData object
 
-            // === FORMAT DATA FOR PDF USING THE NEW FUNCTION ===
+            // === FORMAT DATA FOR PDF ===
             formattedDataForPDF = formatJsonToLines(widgetData);
 
             // === SEND DATA TO JOTFORM ===
