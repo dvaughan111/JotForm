@@ -91,8 +91,9 @@
         let addButtonColor = '#666666';
         let removeButtonColor = '#666666';
 
-        // === Using 'formattedOutputShort' as the hidden Jotform field's unique name ===
-        const HIDDEN_JOTFORM_FIELD_NAME = 'formattedOutputShort'; // CHANGED THIS LINE FOR THE SHORT TEXT FIELD TEST
+        // We no longer send to a separate hidden field.
+        // Instead, we will combine all data into the widget's main 'value'.
+        // const HIDDEN_JOTFORM_FIELD_NAME = 'formattedOutputShort'; // REMOVED THIS LINE
         // ===========================================================================
 
         // Function to format JSON object into lines with "Date:" and "Notes:", sorted newest first
@@ -155,7 +156,14 @@
         JFCustomWidget.subscribe("ready", function(data) {
             if (data && data.value) {
                 try {
-                    widgetData = JSON.parse(data.value);
+                    // When loading data, it will be the combined string. Parse it and get the raw_data.
+                    const combinedData = JSON.parse(data.value);
+                    if (combinedData && combinedData.raw_data) {
+                        widgetData = combinedData.raw_data;
+                    } else {
+                        // Fallback if data is not in the combined format (e.g., old submissions)
+                        widgetData = JSON.parse(data.value);
+                    }
                 } catch (e) {
                     widgetData = {};
                 }
@@ -183,7 +191,7 @@
                 counter = Math.max(0, ...Array.from(ids)) || 0;
             }
             applyButtonColors();
-            updateData(); // Initial data send to update PDF field
+            updateData(); // Initial data send
         });
 
 
@@ -206,12 +214,15 @@
         }
 
         JFCustomWidget.subscribe("submit", function() {
+            // Create the combined object to send as the widget's single value
+            const combinedSubmissionData = {
+                raw_data: widgetData,
+                formatted_for_pdf: formattedDataForPDF
+            };
+
             var result = {
                 valid: true,
-                value: JSON.stringify(widgetData), // On submit, send the current raw widgetData as the main value
-                form: {
-                    [HIDDEN_JOTFORM_FIELD_NAME]: formattedDataForPDF // Send the formatted string to the specific hidden field
-                }
+                value: JSON.stringify(combinedSubmissionData) // Send the combined stringified object
             };
             JFCustomWidget.sendSubmit(result);
         });
@@ -303,11 +314,14 @@
             console.log("Formatted Data for PDF:", formattedDataForPDF); // Debugging line
 
             // === SEND DATA TO JOTFORM ===
+            // Create the combined object to send as the widget's single value
+            const combinedSubmissionData = {
+                raw_data: widgetData,
+                formatted_for_pdf: formattedDataForPDF
+            };
+
             JFCustomWidget.sendData({
-                value: JSON.stringify(widgetData), // Send the raw JSON for internal Jotform storage/submission data
-                form: {
-                    [HIDDEN_JOTFORM_FIELD_NAME]: formattedDataForPDF // Send the formatted string to the specific hidden field
-                }
+                value: JSON.stringify(combinedSubmissionData) // Send the combined stringified object
             });
         }
     </script>
