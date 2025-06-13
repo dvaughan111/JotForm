@@ -134,20 +134,21 @@
                     }
 
                     if (formattedDate) {
-                        result += `Date: ${formattedDate}\n`;
+                        result += `Date: ${formattedDate}\n\n`; // Added extra newline here
                     }
                     result += `Notes:\n`; // Always add Notes: on a new line
                     if (text) {
                         result += `${text}\n`;
                     }
-                    result += '---\n'; // Separator after each entry
+                    result += `<hr>\n`; // Added horizontal line here
                 }
             });
 
-            // Remove the trailing separator if present
-            if (result.endsWith('---\n')) {
-                result = result.slice(0, -4);
+            // Remove the trailing horizontal line if present (or last separator if only one entry)
+            if (result.endsWith('<hr>\n')) {
+                result = result.slice(0, -5); // Remove the <hr> and newline
             }
+
 
             return result;
         }
@@ -203,7 +204,7 @@
 
                 const sortedIdsToLoad = Array.from(ids).sort((a, b) => a - b);
                 sortedIdsToLoad.forEach(id => {
-                    // Ensure the initial date is in YYYY-MM-DD for the input type="date"
+                    // Ensure the initial date is in impeccably-MM-DD for the input type="date"
                     const dateVal = widgetData[`date_${id}`] || '';
                     const textVal = widgetData[`text_${id}`] || '';
                     appendDateTextField(dateVal, textVal);
