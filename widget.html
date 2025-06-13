@@ -95,8 +95,8 @@
 
         // Function to format JSON object into lines with "Date:" and "Notes:", sorted newest first
         function formatJsonToLines(jsonObj) {
-            let result = '';
             const entries = [];
+            const formattedBlocks = [];
 
             // Gather all entries
             for (let key in jsonObj) {
@@ -115,7 +115,6 @@
 
             // Filter out empty entries and sort by ID (descending for newest first)
             const sortedEntries = entries.filter(e => e).sort((a, b) => {
-                // Assuming ID is the index for now, need a more robust way if IDs aren't sequential
                 const idA = entries.indexOf(a);
                 const idB = entries.indexOf(b);
                 return idB - idA;
@@ -124,6 +123,7 @@
             sortedEntries.forEach(entry => {
                 const dateRaw = entry.date || '';
                 const text = entry.text || '';
+                let block = '';
 
                 if (dateRaw || text) { // Only add an entry if there's a date or text for this ID
                     // Format date to DD-MM-YYYY
@@ -134,23 +134,19 @@
                     }
 
                     if (formattedDate) {
-                        result += `Date: ${formattedDate}\n\n`; // Added extra newline here
+                        block += `Date: ${formattedDate}\n\n`; // Blank line after date
                     }
-                    result += `Notes:\n`; // Always add Notes: on a new line
+                    block += `Notes:\n`; // Notes on a new line
                     if (text) {
-                        result += `${text}\n`;
+                        block += `${text}\n`;
                     }
-                    result += `<hr>\n`; // Added horizontal line here
+                    formattedBlocks.push(block);
                 }
             });
 
-            // Remove the trailing horizontal line if present (or last separator if only one entry)
-            if (result.endsWith('<hr>\n')) {
-                result = result.slice(0, -5); // Remove the <hr> and newline
-            }
-
-
-            return result;
+            // Join blocks with the desired separator only between them
+            const separator = '\n\n<hr style="border: none; border-top: 1px solid black; width: 100%;">\n\n';
+            return formattedBlocks.join(separator);
         }
 
 
@@ -204,7 +200,7 @@
 
                 const sortedIdsToLoad = Array.from(ids).sort((a, b) => a - b);
                 sortedIdsToLoad.forEach(id => {
-                    // Ensure the initial date is in impeccably-MM-DD for the input type="date"
+                    // Ensure the initial date is in YYYY-MM-DD for the input type="date"
                     const dateVal = widgetData[`date_${id}`] || '';
                     const textVal = widgetData[`text_${id}`] || '';
                     appendDateTextField(dateVal, textVal);
