@@ -86,44 +86,59 @@
 
     <script>
         let counter = 0;
-        let widgetData = {}; // This stores the raw date_X, text_X pairs
+        let widgetData = {}; // This stores the raw date_X, text_X pairs (used for internal repopulation)
         let formattedDataForPDF = ''; // This will store the combined, formatted string for PDF
+
         let addButtonColor = '#666666';
         let removeButtonColor = '#666666';
 
-        // We no longer send to a separate hidden field.
-        // Instead, we will combine all data into the widget's main 'value'.
-        // const HIDDEN_JOTFORM_FIELD_NAME = 'formattedOutputShort'; // REMOVED THIS LINE
-        // ===========================================================================
 
         // Function to format JSON object into lines with "Date:" and "Notes:", sorted newest first
         function formatJsonToLines(jsonObj) {
             let result = '';
-            const ids = new Set();
+            const entries = [];
 
-            // First, gather all unique IDs from the keys (e.g., from 'date_1', 'text_1')
+            // Gather all entries
             for (let key in jsonObj) {
                 if (jsonObj.hasOwnProperty(key)) {
                     const idMatch = key.match(/_(\d+)$/); // Extract the number at the end
                     if (idMatch) {
-                        ids.add(parseInt(idMatch[1]));
+                        const id = parseInt(idMatch[1]);
+                        const type = key.startsWith('date_') ? 'date' : 'text';
+                        if (!entries[id]) {
+                            entries[id] = {};
+                        }
+                        entries[id][type] = jsonObj[key];
                     }
                 }
             }
 
-            // Sort IDs in DESCENDING order (newest first for PDF)
-            const sortedIds = Array.from(ids).sort((a, b) => b - a);
+            // Filter out empty entries and sort by ID (descending for newest first)
+            const sortedEntries = entries.filter(e => e).sort((a, b) => {
+                // Assuming ID is the index for now, need a more robust way if IDs aren't sequential
+                const idA = entries.indexOf(a);
+                const idB = entries.indexOf(b);
+                return idB - idA;
+            });
 
-            sortedIds.forEach(id => {
-                const date = jsonObj[`date_${id}`] || '';
-                const text = jsonObj[`text_${id}`] || '';
+            sortedEntries.forEach(entry => {
+                const dateRaw = entry.date || '';
+                const text = entry.text || '';
 
-                if (date || text) { // Only add an entry if there's a date or text for this ID
-                    if (date) {
-                        result += `Date: ${date}\n`;
+                if (dateRaw || text) { // Only add an entry if there's a date or text for this ID
+                    // Format date to DD-MM-YYYY
+                    let formattedDate = '';
+                    if (dateRaw) {
+                        const [year, month, day] = dateRaw.split('-');
+                        formattedDate = `${day}-${month}-${year}`;
                     }
+
+                    if (formattedDate) {
+                        result += `Date: ${formattedDate}\n`;
+                    }
+                    result += `Notes:\n`; // Always add Notes: on a new line
                     if (text) {
-                        result += `Notes: ${text}\n`;
+                        result += `${text}\n`;
                     }
                     result += '---\n'; // Separator after each entry
                 }
@@ -156,22 +171,28 @@
         JFCustomWidget.subscribe("ready", function(data) {
             if (data && data.value) {
                 try {
-                    // When loading data, it will be the combined string. Parse it and get the raw_data.
+                    // Try to parse as the old combined JSON for backward compatibility
                     const combinedData = JSON.parse(data.value);
                     if (combinedData && combinedData.raw_data) {
                         widgetData = combinedData.raw_data;
                     } else {
-                        // Fallback if data is not in the combined format (e.g., old submissions)
-                        widgetData = JSON.parse(data.value);
+                        // If it's not the combined JSON, it might be an older single JSON or just plain text
+                        // For this new approach, we don't strictly re-parse an old 'raw_data' object.
+                        // We will rely on addDateTextField to add a default one if widgetData is empty.
+                        // This assumes fresh load or that only the formatted string is saved.
+                        // If we need to repopulate on load from a *previous formatted string submission*,
+                        // we would need to parse that string back into date/text pairs, which is more complex.
+                        // For now, on load, if data.value isn't old combined JSON, widgetData remains empty.
+                        widgetData = {};
                     }
                 } catch (e) {
-                    widgetData = {};
+                    widgetData = {}; // If parsing fails, start fresh
                 }
             }
             if (Object.keys(widgetData).length === 0) {
-                addDateTextField(); // Add one field if none exist
+                addDateTextField(); // Add one field if no data was loaded (e.g., first time or old non-json data)
             } else {
-                // Re-populate fields based on widgetData
+                // Re-populate fields based on widgetData (only if old combined JSON was found)
                 const ids = new Set();
                 Object.keys(widgetData).forEach(key => {
                     const idMatch = key.match(/_((\d+))$/);
@@ -180,14 +201,14 @@
                     }
                 });
 
-                // When loading existing data, we append them in chronological order
-                // The 'addDateTextField' (for new ones) will prepend.
                 const sortedIdsToLoad = Array.from(ids).sort((a, b) => a - b);
                 sortedIdsToLoad.forEach(id => {
-                    appendDateTextField(widgetData[`date_${id}`] || '', widgetData[`text_${id}`] || '');
+                    // Ensure the initial date is in YYYY-MM-DD for the input type="date"
+                    const dateVal = widgetData[`date_${id}`] || '';
+                    const textVal = widgetData[`text_${id}`] || '';
+                    appendDateTextField(dateVal, textVal);
                 });
 
-                // Ensure counter is updated to prevent ID conflicts with existing data
                 counter = Math.max(0, ...Array.from(ids)) || 0;
             }
             applyButtonColors();
@@ -214,44 +235,40 @@
         }
 
         JFCustomWidget.subscribe("submit", function() {
-            // Create the combined object to send as the widget's single value
-            const combinedSubmissionData = {
-                raw_data: widgetData,
-                formatted_for_pdf: formattedDataForPDF
-            };
-
             var result = {
                 valid: true,
-                value: JSON.stringify(combinedSubmissionData) // Send the combined stringified object
+                value: formattedDataForPDF // Send ONLY the formatted string
             };
             JFCustomWidget.sendSubmit(result);
         });
 
         // Function to create a new field group (used for new entries - prepends)
-        function addDateTextField(initialDate = '', initialText = '') {
+        function addDateTextField() {
             counter++;
-            const fieldGroup = createFieldGroup(counter, initialDate, initialText);
+            const fieldGroup = createFieldGroup(counter, '', ''); // New fields start empty
             var container = document.getElementById('container');
             container.insertBefore(fieldGroup, container.firstChild); // Inserts at the beginning
 
             applyButtonColors();
-            updateData();
+            updateData(); // Update data after adding new field
 
-            if (initialText !== '') {
-                const textarea = fieldGroup.querySelector('.text-field');
-                autoResize(textarea);
-            }
+            // No initial text, so no autoResize on addDateTextField
         }
 
         // Helper function for initial loading (appends to maintain original order of loaded data)
         function appendDateTextField(initialDate = '', initialText = '') {
-            const fieldGroup = createFieldGroup(counter + 1, initialDate, initialText); // Use counter + 1 for correct ID
+            counter++; // Increment counter for each loaded field to assign a new ID
+            const fieldGroup = createFieldGroup(counter, initialDate, initialText);
             var container = document.getElementById('container');
             container.appendChild(fieldGroup); // Appends to the end for initial load
 
             applyButtonColors(); // Apply colors just in case
-            // No updateData() or autoResize() call here, as updateData() is called once after all data is loaded
+            if (initialText !== '') {
+                const textarea = fieldGroup.querySelector('.text-field');
+                autoResize(textarea); // Resize if initial text is present
+            }
         }
+
 
         // Helper function to create the field group HTML element
         function createFieldGroup(id, initialDate = '', initialText = '') {
@@ -307,21 +324,15 @@
                 }
             });
 
-            widgetData = currentRawData; // Update the main widgetData object
+            widgetData = currentRawData; // Update the main widgetData object (for internal use)
 
             // === FORMAT DATA FOR PDF ===
             formattedDataForPDF = formatJsonToLines(widgetData);
             console.log("Formatted Data for PDF:", formattedDataForPDF); // Debugging line
 
             // === SEND DATA TO JOTFORM ===
-            // Create the combined object to send as the widget's single value
-            const combinedSubmissionData = {
-                raw_data: widgetData,
-                formatted_for_pdf: formattedDataForPDF
-            };
-
             JFCustomWidget.sendData({
-                value: JSON.stringify(combinedSubmissionData) // Send the combined stringified object
+                value: formattedDataForPDF // Send ONLY the formatted string
             });
         }
     </script>
