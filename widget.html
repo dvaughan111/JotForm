@@ -210,7 +210,7 @@
                 valid: true,
                 value: JSON.stringify(widgetData), // On submit, send the current raw widgetData as the main value
                 form: {
-                    [HIDDEN_JOTFORM_FIELD_NAME]: formattedDataForPDF // Send formatted string to the specific hidden field
+                    [HIDDEN_JOTFORM_FIELD_NAME]: formattedDataForPDF // Send the formatted string to the specific hidden field
                 }
             };
             JFCustomWidget.sendSubmit(result);
