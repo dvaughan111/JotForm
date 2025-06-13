@@ -145,7 +145,8 @@
             });
 
             // Join blocks with the desired separator only between them (using dashes as visual line)
-            const separator = '\n\n----------------------------------------\n\n'; // Blank lines + dashed line + blank lines
+            // Adjust the number of dashes to fit roughly the width of your text area.
+            const separator = '\n\n------------------------------------------------\n\n'; // Blank lines + dashed line + blank lines
             return formattedBlocks.join(separator);
         }
 
