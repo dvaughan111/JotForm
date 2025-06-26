@@ -1,1 +1,339 @@
+<!DOCTYPE html>
+<html>
 
+<head>
+    <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <style>
+        body {
+            font-family: Helvetica, sans-serif;
+            padding: 10px;
+            margin: 0;
+        }
+
+        .add-button,
+        .remove-button {
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            background-color: #666666;
+        }
+
+        .add-button {
+            /* Color will be set dynamically */
+        }
+
+        .field-group {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+            position: relative;
+        }
+
+        .date-field {
+            width: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+
+        .text-field-container {
+            position: relative;
+        }
+
+        .text-field {
+            width: 400px;
+            max-width: 100%;
+            min-height: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            resize: none;
+            overflow: hidden;
+            line-height: 1.4;
+            box-sizing: border-box;
+        }
+
+        .remove-button {
+            font-size: 12px;
+            padding: 5px 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            position: absolute;
+            bottom: 5px;
+            left: 0;
+            margin-bottom: 0;
+        }
+
+        .field-label {
+            font-weight: bold;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="add-button" onclick="addDateTextField()">Add Date + Text Field</button>
+    <div id="container"></div>
+
+    <script>
+        let counter = 0;
+        let widgetData = {}; // This stores the raw date_X, text_X pairs (used for internal repopulation)
+        let formattedDataForPDF = ''; // This will store the combined, formatted string for PDF
+
+        let addButtonColor = '#666666';
+        let removeButtonColor = '#666666';
+
+
+        // Function to format JSON object into lines with "Date:" and "Notes:", sorted newest first
+        function formatJsonToLines(jsonObj) {
+            const entries = [];
+            const formattedBlocks = [];
+
+            // Gather all entries
+            for (let key in jsonObj) {
+                if (jsonObj.hasOwnProperty(key)) {
+                    const idMatch = key.match(/_(\d+)$/); // Extract the number at the end
+                    if (idMatch) {
+                        const id = parseInt(idMatch[1]);
+                        const type = key.startsWith('date_') ? 'date' : 'text';
+                        if (!entries[id]) {
+                            entries[id] = {};
+                        }
+                        entries[id][type] = jsonObj[key];
+                    }
+                }
+            }
+
+            // Filter out empty entries and sort by ID (descending for newest first)
+            const sortedEntries = entries.filter(e => e).sort((a, b) => {
+                const idA = entries.indexOf(a);
+                const idB = entries.indexOf(b);
+                return idB - idA;
+            });
+
+            sortedEntries.forEach(entry => {
+                const dateRaw = entry.date || '';
+                const text = entry.text || '';
+                let block = '';
+
+                if (dateRaw || text) { // Only add an entry if there's a date or text for this ID
+                    // Format date to DD-MM-YYYY
+                    let formattedDate = '';
+                    if (dateRaw) {
+                        const [year, month, day] = dateRaw.split('-');
+                        formattedDate = `${day}-${month}-${year}`;
+                    }
+
+                    if (formattedDate) {
+                        block += `Date: ${formattedDate}\n\n`; // Blank line after date
+                    }
+                    block += `Notes:\n`; // Notes on a new line
+                    if (text) {
+                        block += `${text}\n`;
+                    }
+                    formattedBlocks.push(block);
+                }
+            });
+
+            // Join blocks with the desired separator only between them (using dashes as visual line)
+            // Adjust the number of dashes to fit roughly the width of your text area.
+            const separator = '\n\n------------------------------------------------\n\n'; // Blank lines + dashed line + blank lines
+            return formattedBlocks.join(separator);
+        }
+
+
+        // Initialize ResizeObserver
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.target === document.body) {
+                    const height = entry.contentRect.height;
+                    JFCustomWidget.requestFrameResize({
+                        height: height + 5
+                    });
+                }
+            }
+        });
+
+        resizeObserver.observe(document.body);
+
+
+        JFCustomWidget.subscribe("ready", function(data) {
+            if (data && data.value) {
+                try {
+                    // Try to parse as the old combined JSON for backward compatibility
+                    const combinedData = JSON.parse(data.value);
+                    if (combinedData && combinedData.raw_data) {
+                        widgetData = combinedData.raw_data;
+                    } else {
+                        // If it's not the combined JSON, it might be an older single JSON or just plain text
+                        // For this new approach, we don't strictly re-parse an old 'raw_data' object.
+                        // We will rely on addDateTextField to add a default one if widgetData is empty.
+                        // This assumes fresh load or that only the formatted string is saved.
+                        // If we need to repopulate on load from a *previous formatted string submission*,
+                        // we would need to parse that string back into date/text pairs, which is more complex.
+                        // For now, on load, if data.value isn't old combined JSON, widgetData remains empty.
+                        widgetData = {};
+                    }
+                } catch (e) {
+                    widgetData = {}; // If parsing fails, start fresh
+                }
+            }
+            if (Object.keys(widgetData).length === 0) {
+                addDateTextField(); // Add one field if no data was loaded (e.g., first time or old non-json data)
+            } else {
+                // Re-populate fields based on widgetData (only if old combined JSON was found)
+                const ids = new Set();
+                Object.keys(widgetData).forEach(key => {
+                    const idMatch = key.match(/_((\d+))$/);
+                    if (idMatch) {
+                        ids.add(parseInt(idMatch[1]));
+                    }
+                });
+
+                const sortedIdsToLoad = Array.from(ids).sort((a, b) => a - b);
+                sortedIdsToLoad.forEach(id => {
+                    // Ensure the initial date is in YYYY-MM-DD for the input type="date"
+                    const dateVal = widgetData[`date_${id}`] || '';
+                    const textVal = widgetData[`text_${id}`] || '';
+                    appendDateTextField(dateVal, textVal);
+                });
+
+                counter = Math.max(0, ...Array.from(ids)) || 0;
+            }
+            applyButtonColors();
+            updateData(); // Initial data send
+        });
+
+
+        JFCustomWidget.subscribe("settingsRead", function(data) {
+            addButtonColor = data.addButtonColor || '#666666';
+            removeButtonColor = data.removeButtonColor || '#666666';
+            applyButtonColors();
+        });
+
+        function applyButtonColors() {
+            const addButtons = document.querySelectorAll('.add-button');
+            addButtons.forEach(button => {
+                button.style.backgroundColor = addButtonColor;
+            });
+
+            const removeButtons = document.querySelectorAll('.remove-button');
+            removeButtons.forEach(button => {
+                button.style.backgroundColor = removeButtonColor;
+            });
+        }
+
+        JFCustomWidget.subscribe("submit", function() {
+            var result = {
+                valid: true,
+                value: formattedDataForPDF // Send ONLY the formatted string
+            };
+            JFCustomWidget.sendSubmit(result);
+        });
+
+        // Function to create a new field group (used for new entries - prepends)
+        function addDateTextField() {
+            counter++;
+            const fieldGroup = createFieldGroup(counter, '', ''); // New fields start empty
+            var container = document.getElementById('container');
+            container.insertBefore(fieldGroup, container.firstChild); // Inserts at the beginning
+
+            applyButtonColors();
+            updateData(); // Update data after adding new field
+
+            // No initial text, so no autoResize on addDateTextField
+        }
+
+        // Helper function for initial loading (appends to maintain original order of loaded data)
+        function appendDateTextField(initialDate = '', initialText = '') {
+            counter++; // Increment counter for each loaded field to assign a new ID
+            const fieldGroup = createFieldGroup(counter, initialDate, initialText);
+            var container = document.getElementById('container');
+            container.appendChild(fieldGroup); // Appends to the end for initial load
+
+            applyButtonColors(); // Apply colors just in case
+            if (initialText !== '') {
+                const textarea = fieldGroup.querySelector('.text-field');
+                autoResize(textarea); // Resize if initial text is present
+            }
+        }
+
+
+        // Helper function to create the field group HTML element
+        function createFieldGroup(id, initialDate = '', initialText = '') {
+            var fieldGroup = document.createElement('div');
+            fieldGroup.className = 'field-group';
+            fieldGroup.id = 'group-' + id;
+
+            fieldGroup.innerHTML = `
+                <div class="field-label">Date:</div>
+                <input type="date" class="date-field" name="date_${id}" value="${initialDate}" onchange="updateData()">
+                <div class="field-label">Notes:</div>
+                <div class="text-field-container">
+                    <textarea class="text-field" name="text_${id}" placeholder="Enter text here..." oninput="autoResize(this); updateData();" onchange="updateData()">${initialText}</textarea>
+                    <button class="remove-button" onclick="removeGroup('group-${id}')">Remove</button>
+                </div>
+            `;
+            return fieldGroup;
+        }
+
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 20;
+            const paddingTop = parseFloat(window.getComputedStyle(textarea).paddingTop);
+            const paddingBottom = parseFloat(window.getComputedStyle(textarea).paddingBottom);
+
+            const baseHeight = (8 * lineHeight) + paddingTop + paddingBottom;
+
+            textarea.style.height = Math.max(baseHeight, textarea.scrollHeight) + 'px';
+        }
+
+        function removeGroup(groupId) {
+            document.getElementById(groupId).remove();
+            updateData();
+        }
+
+        function updateData() {
+            const currentRawData = {};
+            const dateFields = document.querySelectorAll('.date-field');
+            const textFields = document.querySelectorAll('.text-field');
+
+            dateFields.forEach(field => {
+                const idMatch = field.name.match(/date_((\d+))$/);
+                if (idMatch) {
+                    currentRawData[`date_${idMatch[1]}`] = field.value;
+                }
+            });
+
+            textFields.forEach(field => {
+                const idMatch = field.name.match(/text_((\d+))$/);
+                if (idMatch) {
+                    currentRawData[`text_${idMatch[1]}`] = field.value;
+                }
+            });
+
+            widgetData = currentRawData; // Update the main widgetData object (for internal use)
+
+            // === FORMAT DATA FOR PDF ===
+            formattedDataForPDF = formatJsonToLines(widgetData);
+            console.log("Formatted Data for PDF:", formattedDataForPDF); // Debugging line
+
+            // === SEND DATA TO JOTFORM ===
+            JFCustomWidget.sendData({
+                value: formattedDataForPDF // Send ONLY the formatted string
+            });
+        }
+    </script>
+</body>
+
+</html>
